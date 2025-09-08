@@ -1,0 +1,38 @@
+services:
+  web:
+    image: node:20-alpine
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    command: >-
+      sh -c "npm install -g pnpm && pnpm i && pnpm run dev"
+
+  api:
+    image: node:20-alpine
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    environment:
+      PORT: "4000"
+      DATABASE_URL: postgres://appuser:apppassword@db:5432/appdb
+    command: >-
+      sh -c "npm install -g pnpm && pnpm i && pnpm run dev:server"
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppassword
+      - POSTGRES_DB=appdb
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+volumes:
+  pg_data:
