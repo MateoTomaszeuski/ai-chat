@@ -51,14 +51,12 @@ function App() {
   };
 
   return (
-    <div className="max-w-2xl w-full bg-light-blue-50 rounded-xl p-8 shadow-[0_4px_6px_-1px_hsl(200,20%,0%,0.1),0_2px_4px_-1px_hsl(200,20%,0%,0.06)]">
-      <h1 className="text-3xl font-semibold text-blue-gray-200 mb-8 text-center">Items Manager</h1>
+    <div className="app-container">
+      <h1>Items Manager</h1>
 
-      <form onSubmit={addItem} className="bg-white p-6 rounded-lg border border-light-blue-100 mb-8">
-        <div className="mb-6">
-          <label htmlFor="name" className="block font-medium text-blue-gray-400 mb-2 text-sm">
-            Item Name:
-          </label>
+      <form onSubmit={addItem} className="form-container">
+        <div className="form-group">
+          <label htmlFor="name">Item Name:</label>
           <input
             id="name"
             type="text"
@@ -66,14 +64,11 @@ function App() {
             onChange={(e) => setName(e.target.value)}
             placeholder="Enter item name"
             required
-            className="w-full p-4 border border-light-blue-100 rounded-md font-sans text-base text-blue-gray-200 bg-white transition-all duration-200 focus:outline-none focus:border-light-blue-300 focus:shadow-[0_0_0_3px_hsl(200,60%,70%,0.1)] placeholder:text-blue-gray-500"
           />
         </div>
 
-        <div className="mb-8">
-          <label htmlFor="quantity" className="block font-medium text-blue-gray-400 mb-2 text-sm">
-            Quantity:
-          </label>
+        <div className="form-group">
+          <label htmlFor="quantity">Quantity:</label>
           <input
             id="quantity"
             type="number"
@@ -81,36 +76,25 @@ function App() {
             onChange={(e) => setQuantity(Number(e.target.value))}
             min="1"
             max="1000"
-            className="w-full p-4 border border-light-blue-100 rounded-md font-sans text-base text-blue-gray-200 bg-white transition-all duration-200 focus:outline-none focus:border-light-blue-300 focus:shadow-[0_0_0_3px_hsl(200,60%,70%,0.1)]"
           />
         </div>
 
-        <button 
-          type="submit" 
-          disabled={loading || !name.trim()}
-          className="w-full py-4 px-6 bg-light-blue-500 text-white border-0 rounded-md font-sans text-base font-medium cursor-pointer transition-all duration-200 hover:bg-light-blue-600 hover:-translate-y-px active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed disabled:transform-none"
-        >
+        <button type="submit" disabled={loading || !name.trim()}>
           {loading ? "Adding..." : "Add Item"}
         </button>
       </form>
 
-      <div className="bg-white rounded-lg border border-light-blue-100 overflow-hidden">
-        <h2 className="bg-light-blue-200 p-6 m-0 border-b border-light-blue-100 text-xl font-medium text-blue-gray-200">
-          Items ({items.length})
-        </h2>
+      <div className="items-container">
+        <h2 className="items-header">Items ({items.length})</h2>
         {items.length === 0 ? (
-          <p className="p-8 text-center text-blue-gray-500 italic">
-            No items yet. Add one above!
-          </p>
+          <p className="empty-state">No items yet. Add one above!</p>
         ) : (
-          <ul className="list-none">
+          <ul>
             {items.map((item) => (
-              <li key={item.id} className="flex items-center gap-4 p-6 border-b border-light-blue-100 last:border-b-0 transition-colors duration-200 hover:bg-light-blue-75">
-                <span className="flex-1 font-medium text-blue-gray-200">{item.name}</span>
-                <span className="text-sm text-blue-gray-400 bg-light-blue-50 py-1 px-2 rounded-md">
-                  Qty: {item.quantity}
-                </span>
-                <span className="text-xs text-blue-gray-500 min-w-fit">
+              <li key={item.id} className="item">
+                <span className="item-name">{item.name}</span>
+                <span className="item-quantity">Qty: {item.quantity}</span>
+                <span className="item-date">
                   {new Date(item.created_at).toLocaleDateString()}
                 </span>
               </li>
