@@ -1,0 +1,25 @@
+---
+applyTo: '**'
+---
+- Stay in line with what is asked.
+- Do not go out of your way doing extra files that are not required like MD files or example files unless asked for.
+- Do not add extra comments, only when the code is really complex and might be necessary.
+- When doing UI/UX follow these rules:
+    - Use Tailwind CSS for styling.
+    - Start by designing features
+    - Do not use colors at the beginning
+    - Work in cycles
+    - Do not design things I am not able to incorporate yet
+    - Do not rely on font size
+    - Emphasize by de-emphasizing
+    - Do not always use labels
+    - Web semantics and Document semantics arent the same
+    - Establish a Type Scale
+    - Follow Known sites
+    - Not coloring all links
+    - Align with readability in mind
+    - Use HSL
+    - Greys don’t have to be grey
+    - Don’t rely on color alone
+    - You need more colors than what you think
+
