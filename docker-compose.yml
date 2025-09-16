@@ -11,6 +11,8 @@ services:
       - /app/node_modules
     command: >-
       sh -c "npm install -g pnpm && pnpm i && pnpm run dev"
+    depends_on:
+      - api
 
   api:
     image: node:20-alpine
@@ -25,6 +27,8 @@ services:
       DATABASE_URL: postgres://appuser:apppassword@db:5432/appdb
     command: >-
       sh -c "npm install -g pnpm && pnpm i && pnpm run dev:server"
+    depends_on:
+      - db
 
   db:
     image: postgres:16-alpine
