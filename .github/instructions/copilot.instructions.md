@@ -22,4 +22,7 @@ applyTo: '**'
     - Greys don’t have to be grey
     - Don’t rely on color alone
     - You need more colors than what you think
-
+    - Emulate a light source
+    - Use Shadows to convey elevation
+    - Even Flat designs can have deph
+    - Overlap elements to create layers

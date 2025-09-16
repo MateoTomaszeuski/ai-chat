@@ -1,6 +1,6 @@
-@api_base= https://ai-snow.reindeer-pinecone.ts.net/api/chat/completions
+@llm_api_base= https://ai-snow.reindeer-pinecone.ts.net/api/chat/completions
 
-POST {{api_base}}
+POST {{llm_api_base}}
 Content-Type: application/json
 Authorization: Bearer {{$dotenv API_KEY}}
 
@@ -12,4 +12,13 @@ Authorization: Bearer {{$dotenv API_KEY}}
         "content": "Why is the sky blue?"
       }
     ]
+}
+
+### Test local chat endpoint
+
+POST http://localhost:4000/api/chat
+Content-Type: application/json
+
+{
+    "message": "Hello! How are you doing today?"
 }

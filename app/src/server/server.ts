@@ -1,10 +1,9 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
-import { z } from "zod";
 import pgPromise from "pg-promise";
 import { readFile } from "node:fs/promises";
-import { CreateItemSchema, ItemRowSchema } from "../lib/itemModels";
+import { AIService, ChatRequest } from "./services/aiService";
 
 const pgp = pgPromise({});
 const connectionString = process.env.DATABASE_URL;
@@ -15,8 +14,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Initialize AI Service
+const aiService = new AIService();
+
 app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
+});
+
+app.post("/api/chat", async (req, res, next) => {
+  try {
+    const parsed = ChatRequest.parse(req.body);
+    const result = await aiService.getChatCompletion(parsed.message);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
 });
 
 async function ensureSchema() {
@@ -25,40 +37,10 @@ async function ensureSchema() {
   await db.none(raw); // execute sql, expect no return value
 }
 
-app.post("/api/items", async (req, res, next) => {
-  try {
-    const parsed = CreateItemSchema.parse(req.body);
-    const { name, quantity } = parsed;
-    const row = await db.one(
-      `INSERT INTO item(name, quantity) VALUES($1, $2)
-       RETURNING id, name, quantity, created_at`,
-      [name, quantity]
-    );
-    const item = ItemRowSchema.parse(row);
-    res.json(item);
-  } catch (err) {
-    next(err);
-  }
-});
-
-app.get("/api/items", async (_req, res, next) => {
-  try {
-    const rows = await db.manyOrNone(
-      `SELECT id, name, quantity, created_at FROM item ORDER BY id DESC LIMIT 100`
-    );
-
-    const ItemsArraySchema = z.array(ItemRowSchema);
-    const items = ItemsArraySchema.parse(rows);
-    res.json(items);
-  } catch (err) {
-    next(err);
-  }
-});
-
 async function start() {
   await ensureSchema();
-  const port = 4444;
-  app.listen(port, () =>
+  const port = Number(process.env.PORT) || 4444;
+  app.listen(port, "0.0.0.0", () =>
     console.log(`API listening on port ${port}`)
   );
 }
