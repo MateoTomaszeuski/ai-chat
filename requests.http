@@ -20,5 +20,10 @@ POST http://localhost:4000/api/chat
 Content-Type: application/json
 
 {
-    "message": "Hello! How are you doing today?"
+    "messages": [
+        {
+            "role": "user",
+            "content": "Hello! How are you doing today?"
+        }
+    ]
 }

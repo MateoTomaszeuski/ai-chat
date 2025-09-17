@@ -32,7 +32,7 @@ const OpenAIChatCompletionResponse = z.object({
 
 // Our internal API types (what leaves this service)
 export const ChatRequest = z.object({
-  message: z.string(),
+  messages: z.array(OpenAIChatMessage),
 });
 
 export const ChatResponse = z.object({
@@ -58,16 +58,14 @@ export class AIService {
     this.apiKey = process.env.API_KEY;
   }
 
-  async getChatCompletion(userMessage: string): Promise<ChatResponseType> {
+  async getChatCompletion(messages: z.infer<typeof OpenAIChatMessage>[]): Promise<ChatResponseType> {
     try {
       const requestData = OpenAIChatCompletionRequest.parse({
         model: this.model,
-        messages: [
-          {
-            role: "user",
-            content: userMessage,
-          },
-        ],
+        messages: messages.map(msg => ({
+          role: msg.role,
+          content: msg.content,
+        })),
       });
 
       const response = await fetch(this.apiBaseUrl, {

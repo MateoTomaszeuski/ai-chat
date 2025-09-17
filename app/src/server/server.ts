@@ -24,7 +24,7 @@ app.get("/api/health", (_req, res) => {
 app.post("/api/chat", async (req, res, next) => {
   try {
     const parsed = ChatRequest.parse(req.body);
-    const result = await aiService.getChatCompletion(parsed.message);
+    const result = await aiService.getChatCompletion(parsed.messages);
     res.json(result);
   } catch (err) {
     next(err);

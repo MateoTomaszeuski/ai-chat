@@ -35,17 +35,22 @@ function App() {
 
     // Add the user message immediately
     setMessages((prev) => [...prev, userMessage]);
-    const messageToSend = currentMessage;
     setCurrentMessage("");
     setLoading(true);
 
     try {
+      // Convert chat messages to OpenAI format
+      const messagesToSend = [...messages, userMessage].map(msg => ({
+        role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
+        content: msg.content
+      }));
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ message: messageToSend }),
+        body: JSON.stringify({ messages: messagesToSend }),
       });
 
       if (response.ok) {
