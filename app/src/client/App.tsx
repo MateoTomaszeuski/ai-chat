@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { AiOutlineSend } from "react-icons/ai";
+import { MarkdownRenderer } from "./components/MarkdownRenderer";
 
 interface ChatMessage {
   id: string;
@@ -100,7 +101,11 @@ function App() {
               }`}
             >
               <div className="message-content">
-                {message.content}
+                {message.sender === 'ai' ? (
+                  <MarkdownRenderer content={message.content} />
+                ) : (
+                  message.content
+                )}
               </div>
               <div className="message-time">
                 {message.timestamp.toLocaleTimeString([], { 

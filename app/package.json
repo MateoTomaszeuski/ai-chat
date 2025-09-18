@@ -13,8 +13,10 @@
   },
   "dependencies": {
     "cors": "^2.8.5",
+    "dompurify": "^3.2.7",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "marked": "^16.3.0",
     "pg-promise": "^11.7.6",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
