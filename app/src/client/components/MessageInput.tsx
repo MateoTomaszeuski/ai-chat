@@ -1,21 +1,26 @@
+import { useState } from "react";
 import { AiOutlineSend } from "react-icons/ai";
 
 interface MessageInputProps {
-  currentMessage: string;
-  setCurrentMessage: (message: string) => void;
   loading: boolean;
-  onSendMessage: (e: React.FormEvent) => void;
+  onSendMessage: (userPrompt: string) => Promise<void>;
 }
 
-export function MessageInput({ 
-  currentMessage, 
-  setCurrentMessage, 
-  loading, 
-  onSendMessage 
-}: MessageInputProps) {
+export function MessageInput({ loading, onSendMessage }: MessageInputProps) {
+  const [currentMessage, setCurrentMessage] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentMessage.trim() || loading) return;
+
+    const messageToSend = currentMessage;
+    setCurrentMessage(""); // Clear input immediately
+    await onSendMessage(messageToSend);
+  };
+
   return (
     <div className="input-container">
-      <form onSubmit={onSendMessage} className="message-form">
+      <form onSubmit={handleSubmit} className="message-form">
         <input
           type="text"
           placeholder="Type your message here..."
