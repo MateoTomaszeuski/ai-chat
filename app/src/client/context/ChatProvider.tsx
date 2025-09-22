@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ChatContext } from "./ChatContext";
 import type { ChatMessage } from "../types/chat";
 import type { ChatContextType } from "./ChatContext";
+import { chatService } from "../services/chatService";
 
 interface ChatProviderProps {
   children: ReactNode;
@@ -20,62 +21,26 @@ export function ChatProvider({ children }: ChatProviderProps) {
     setLoading(true);
     setLastUserPrompt(userPrompt);
 
-    // Create user message
-    const messageId = Date.now().toString();
-    const userMessage: ChatMessage = {
-      id: messageId,
-      content: userPrompt,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-
-    // Add user message immediately
-    setMessages(prevMessages => [...prevMessages, userMessage]);
-
     try {
-      // Convert all messages to OpenAI format including the new user message
-      const allMessages = [...messages, userMessage];
-      const messagesToSend = allMessages.map(msg => ({
-        role: msg.sender === 'user' ? 'user' as const : 'assistant' as const,
-        content: msg.content
-      }));
-
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ messages: messagesToSend }),
+      const result = await chatService.getAIResponse({
+        messages,
+        userPrompt
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        const aiResponseText = data.response || data.error || "No response received";
-        setAiResponse(aiResponseText);
-
-        const aiMessage: ChatMessage = {
-          id: Date.now().toString() + "_ai",
-          content: aiResponseText,
-          sender: 'ai',
-          timestamp: new Date(),
-        };
-        
-        setMessages(prevMessages => [...prevMessages, aiMessage]);
+      if ('errorMessage' in result) {
+        // Handle error case
+        setAiResponse(result.errorMessage.content);
+        setMessages(prevMessages => [...prevMessages, result.errorMessage]);
       } else {
-        const errorText = "Error: Failed to get response from server";
-        setAiResponse(errorText);
+        // Handle successful case
+        const { userMessage, aiMessage } = result;
+        setAiResponse(aiMessage.content);
         
-        const errorMessage: ChatMessage = {
-          id: Date.now().toString() + "_error",
-          content: errorText,
-          sender: 'ai',
-          timestamp: new Date(),
-        };
-        
-        setMessages(prevMessages => [...prevMessages, errorMessage]);
+        // Add both user and AI messages
+        setMessages(prevMessages => [...prevMessages, userMessage, aiMessage]);
       }
     } catch {
-      const errorText = "Error: Unable to connect to server";
+      const errorText = "Error: Service unavailable";
       setAiResponse(errorText);
       
       const errorMessage: ChatMessage = {
