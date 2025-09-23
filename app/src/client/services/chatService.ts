@@ -6,7 +6,6 @@ export interface ChatServiceOptions {
 }
 
 export interface ChatServiceResponse {
-  userMessage: ChatMessage;
   aiMessage: ChatMessage;
 }
 
@@ -20,10 +19,9 @@ export class ChatService {
       throw new Error("User prompt cannot be empty");
     }
 
-    // Create user message
-    const messageId = Date.now().toString();
+    // Create user message for API call
     const userMessage: ChatMessage = {
-      id: messageId,
+      id: Date.now().toString(),
       content: userPrompt,
       sender: 'user',
       timestamp: new Date(),
@@ -56,7 +54,7 @@ export class ChatService {
           timestamp: new Date(),
         };
         
-        return { userMessage, aiMessage };
+        return { aiMessage };
       } else {
         const errorText = "Error: Failed to get response from server";
         

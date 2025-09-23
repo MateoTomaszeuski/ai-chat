@@ -21,6 +21,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
     setLoading(true);
     setLastUserPrompt(userPrompt);
 
+    // Create and immediately display user message
+    const messageId = Date.now().toString();
+    const userMessage: ChatMessage = {
+      id: messageId,
+      content: userPrompt,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+
+    // Immediately add user message to display
+    setMessages(prevMessages => [...prevMessages, userMessage]);
+
     try {
       const result = await chatService.getAIResponse({
         messages,
@@ -28,18 +40,18 @@ export function ChatProvider({ children }: ChatProviderProps) {
       });
 
       if ('errorMessage' in result) {
-        // Handle error case
+        // Handle error case - user message is already displayed
         setAiResponse(result.errorMessage.content);
         setMessages(prevMessages => [...prevMessages, result.errorMessage]);
       } else {
-        // Handle successful case
-        const { userMessage, aiMessage } = result;
+        // Handle successful case - user message is already displayed, just add AI response
+        const { aiMessage } = result;
         setAiResponse(aiMessage.content);
         
-        // Add both user and AI messages
-        setMessages(prevMessages => [...prevMessages, userMessage, aiMessage]);
+        // Add only AI message since user message is already displayed
+        setMessages(prevMessages => [...prevMessages, aiMessage]);
       }
-    } catch {
+    } catch (error) {
       const errorText = "Error: Service unavailable";
       setAiResponse(errorText);
       
@@ -51,6 +63,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       };
       
       setMessages(prevMessages => [...prevMessages, errorMessage]);
+      
+      // Log error for debugging
+      console.error("Chat error:", error);
     } finally {
       setLoading(false);
     }
