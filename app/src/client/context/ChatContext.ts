@@ -1,9 +1,13 @@
 import { createContext, useContext } from "react";
-import type { ChatMessage } from "../types/chat";
+import type { ChatMessage, Conversation } from "../types/chat";
 
 export interface ChatContextType {
   // Message history
   messages: ChatMessage[];
+  
+  // Conversations
+  conversations: Conversation[];
+  currentConversationId: number | null;
   
   // AI interaction
   getAIResponse: (userPrompt: string) => Promise<void>;
@@ -12,6 +16,12 @@ export interface ChatContextType {
   
   // State flags
   loading: boolean;
+  
+  // Conversation management
+  loadConversation: (conversationId: number) => Promise<void>;
+  createNewConversation: () => Promise<void>;
+  loadConversations: () => Promise<void>;
+  deleteConversation: (conversationId: number) => Promise<void>;
   
   // Utility functions
   clearMessages: () => void;

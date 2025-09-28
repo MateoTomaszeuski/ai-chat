@@ -10,9 +10,13 @@ export function ChatApp() {
   };
 
   return (
-    <div className="chat-app">
-      <ChatContainer messages={messages} loading={loading} />
-      <MessageInput onSendMessage={handleSendMessage} loading={loading} />
+    <div className="flex flex-col h-full">
+      <div className="flex-1 overflow-hidden">
+        <ChatContainer messages={messages} loading={loading} />
+      </div>
+      <div className="border-t bg-white">
+        <MessageInput onSendMessage={handleSendMessage} loading={loading} />
+      </div>
     </div>
   );
 }

@@ -1,12 +1,15 @@
-import type { ChatMessage } from "../types/chat";
+import type { ChatMessage, Conversation } from "../types/chat";
 
 export interface ChatServiceOptions {
   messages: ChatMessage[];
   userPrompt: string;
+  conversationId?: number;
 }
 
 export interface ChatServiceResponse {
   aiMessage: ChatMessage;
+  conversationId: number;
+  titleGenerated?: boolean;
 }
 
 export interface ChatServiceError {
@@ -14,7 +17,67 @@ export interface ChatServiceError {
 }
 
 export class ChatService {
-  async getAIResponse({ messages, userPrompt }: ChatServiceOptions): Promise<ChatServiceResponse | ChatServiceError> {
+  async getConversations(): Promise<Conversation[]> {
+    try {
+      const response = await fetch("/api/conversations");
+      if (response.ok) {
+        return await response.json();
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      return [];
+    }
+  }
+
+  async createNewConversation(): Promise<Conversation | null> {
+    try {
+      const response = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error("Error creating conversation:", error);
+      return null;
+    }
+  }
+
+  async getConversationMessages(conversationId: number): Promise<ChatMessage[]> {
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/messages`);
+      if (response.ok) {
+        const dbMessages = await response.json();
+        return dbMessages.map((msg: { id: number; message_content: string; message_type_id: number; created_at: string }) => ({
+          id: msg.id.toString(),
+          content: msg.message_content,
+          sender: msg.message_type_id === 1 ? 'user' as const : 'ai' as const,
+          timestamp: new Date(msg.created_at),
+        }));
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching conversation messages:", error);
+      return [];
+    }
+  }
+
+  async deleteConversation(conversationId: number): Promise<boolean> {
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}`, {
+        method: "DELETE",
+      });
+      return response.ok;
+    } catch (error) {
+      console.error("Error deleting conversation:", error);
+      return false;
+    }
+  }
+
+  async getAIResponse({ messages, userPrompt, conversationId }: ChatServiceOptions): Promise<ChatServiceResponse | ChatServiceError> {
     if (!userPrompt.trim()) {
       throw new Error("User prompt cannot be empty");
     }
@@ -40,7 +103,10 @@ export class ChatService {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ messages: messagesToSend }),
+        body: JSON.stringify({ 
+          messages: messagesToSend,
+          conversationId 
+        }),
       });
 
       if (response.ok) {
@@ -54,7 +120,11 @@ export class ChatService {
           timestamp: new Date(),
         };
         
-        return { aiMessage };
+        return { 
+          aiMessage,
+          conversationId: data.conversationId || conversationId || 0,
+          titleGenerated: data.titleGenerated || false
+        };
       } else {
         const errorText = "Error: Failed to get response from server";
         

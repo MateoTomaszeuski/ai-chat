@@ -11,14 +11,13 @@
   }
 
   #root {
-    @apply h-screen flex items-center justify-center p-4 overflow-hidden;
+    @apply h-screen overflow-hidden;
   }
 }
 
 @layer components {
   .chat-app {
-    @apply flex flex-col max-w-3xl w-full bg-slate-50 rounded-2xl shadow-lg overflow-hidden;
-    height: calc(100vh - 2rem);
+    @apply flex flex-col w-full bg-slate-50 overflow-hidden h-full;
   }
 
   .chat-container {

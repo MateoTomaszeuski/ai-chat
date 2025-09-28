@@ -9,18 +9,9 @@ export class ChatDBService {
     this.aiService = new AIService();
   }
 
-  // Get or create a single conversation (since we're using only 1 conversation for now)
-  async getOrCreateConversation(): Promise<Conversation> {
+  // Create a new conversation
+  async createNewConversation(): Promise<Conversation> {
     try {
-      // Check if there's already a conversation
-      const existingConversation = await db.oneOrNone<Conversation>(
-        'SELECT id, title, created_at FROM conversations ORDER BY id ASC LIMIT 1'
-      );
-
-      if (existingConversation) {
-        return existingConversation;
-      }
-
       // Create new conversation with a default title (will be updated later)
       const newConversation = await db.one<Conversation>(
         'INSERT INTO conversations (title) VALUES ($1) RETURNING id, title, created_at',
@@ -29,24 +20,61 @@ export class ChatDBService {
 
       return newConversation;
     } catch (error) {
-      console.error('Error getting or creating conversation:', error);
-      throw new Error('Failed to get or create conversation');
+      console.error('Error creating conversation:', error);
+      throw new Error('Failed to create conversation');
+    }
+  }
+
+  // Get a specific conversation by ID
+  async getConversationById(conversationId: number): Promise<Conversation | null> {
+    try {
+      const conversation = await db.oneOrNone<Conversation>(
+        'SELECT id, title, created_at FROM conversations WHERE id = $1',
+        [conversationId]
+      );
+      return conversation;
+    } catch (error) {
+      console.error('Error getting conversation by ID:', error);
+      return null;
+    }
+  }
+
+  // Get all conversations ordered by most recent
+  async getAllConversations(): Promise<Conversation[]> {
+    try {
+      const conversations = await db.any<Conversation>(
+        'SELECT id, title, created_at FROM conversations ORDER BY created_at DESC'
+      );
+      return conversations;
+    } catch (error) {
+      console.error('Error getting all conversations:', error);
+      return [];
     }
   }
 
   // Generate and update conversation title based on first user message
   async generateAndUpdateConversationTitle(conversationId: number, firstUserMessage: string): Promise<void> {
     try {
-      // Generate a title using AI
+      // Generate a title using AI - make it very short for sidebar
       const titlePrompt = [
         {
           role: 'user' as const,
-          content: `Generate a short, concise title (max 50 characters) for a conversation that starts with this message: "${firstUserMessage}". Only respond with the title, no quotes or additional text.`
+          content: `Create a very short title (max 25 characters) for a sidebar chat list. Based on this message: "${firstUserMessage}". Reply only with the title, no quotes.`
         }
       ];
 
       const titleResponse = await this.aiService.getChatCompletion(titlePrompt);
-      const title = titleResponse.response.trim().substring(0, 50) || 'New Chat';
+      let title = titleResponse.response.trim();
+      
+      // Clean up the title - remove quotes and ensure it's short
+      title = title.replace(/['"]/g, '').trim();
+      title = title.substring(0, 25) || 'New Chat';
+      
+      // If title is too generic, create a more specific one
+      if (title.toLowerCase() === 'new chat' && firstUserMessage.length > 0) {
+        const words = firstUserMessage.split(' ').slice(0, 3);
+        title = words.join(' ').substring(0, 25);
+      }
 
       // Update conversation title
       await db.none(
@@ -55,7 +83,16 @@ export class ChatDBService {
       );
     } catch (error) {
       console.error('Error generating conversation title:', error);
-      // Don't throw here, as this is not critical - the conversation still works with default title
+      // Fallback to a simple title based on first few words
+      try {
+        const fallbackTitle = firstUserMessage.split(' ').slice(0, 3).join(' ').substring(0, 25) || 'New Chat';
+        await db.none(
+          'UPDATE conversations SET title = $1 WHERE id = $2',
+          [fallbackTitle, conversationId]
+        );
+      } catch (fallbackError) {
+        console.error('Error with fallback title:', fallbackError);
+      }
     }
   }
 
@@ -105,6 +142,23 @@ export class ChatDBService {
     } catch (error) {
       console.error('Error getting conversation messages:', error);
       throw new Error('Failed to get conversation messages');
+    }
+  }
+
+  // Delete a conversation and all its messages
+  async deleteConversation(conversationId: number): Promise<boolean> {
+    try {
+      // The CASCADE delete in our schema will automatically delete all messages
+      // when a conversation is deleted
+      const result = await db.result(
+        'DELETE FROM conversations WHERE id = $1',
+        [conversationId]
+      );
+      
+      return result.rowCount > 0;
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      throw new Error('Failed to delete conversation');
     }
   }
 }
