@@ -2,7 +2,9 @@
 applyTo: '**'
 ---
 - Stay in line with what is asked.
-- Do not go out of your way doing extra files that are not required like MD files or example files unless asked for.
+- Do not go out of your way doing extra files like
+    - example files
+    - summary files
 - Do not add extra comments, only when the code is really complex and might be necessary.
 - Use tailwind v4 for styling.
     - Ignore the @apply linting errors, we want to use it.
