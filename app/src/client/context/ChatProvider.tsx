@@ -62,16 +62,13 @@ export function ChatProvider({ children }: ChatProviderProps) {
         conversationId: currentConversationId || undefined
       });
 
-      if ('errorMessage' in result.result) {
-        setAiResponse(result.result.errorMessage.content);
-      } else {
-        const { aiMessage, conversationId: resultConversationId } = result.result;
-        setAiResponse(aiMessage.content);
-        
-        // Update current conversation ID if it was created
-        if (!currentConversationId && resultConversationId) {
-          setCurrentConversationId(resultConversationId);
-        }
+      // The new API structure returns the response directly
+      const { aiMessage, conversationId: resultConversationId } = result.result;
+      setAiResponse(aiMessage.content);
+      
+      // Update current conversation ID if it was created
+      if (!currentConversationId && resultConversationId) {
+        setCurrentConversationId(resultConversationId);
       }
     } catch (error) {
       const errorText = "Error: Service unavailable";

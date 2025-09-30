@@ -1,26 +1,32 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { chatService } from '../services/chatService'
-import type { ChatServiceOptions } from '../services/chatService'
+import { messageApi, chatApi } from '../services/api'
 import type { ChatMessage } from '../types/chat'
-import { CONVERSATIONS_QUERY_KEY } from './useConversations'
+import type { ChatServiceOptions } from '../services/api'
+import { queryKeys } from '../lib/queryKeys'
 
-export const getConversationMessagesQueryKey = (conversationId: number) => 
-  ['conversations', conversationId, 'messages']
-
+/**
+ * Query hook for fetching messages in a conversation
+ */
 export function useConversationMessages(conversationId: number | null) {
   return useQuery({
-    queryKey: getConversationMessagesQueryKey(conversationId || 0),
-    queryFn: () => conversationId ? chatService.getConversationMessages(conversationId) : [],
+    queryKey: conversationId ? queryKeys.message.list(conversationId) : ['messages', 'empty'],
+    queryFn: () => conversationId ? messageApi.getByConversation(conversationId) : [],
     enabled: conversationId !== null,
     staleTime: 1000 * 60 * 2, // 2 minutes
+    gcTime: 1000 * 60 * 5, // 5 minutes
   })
 }
 
+/**
+ * Mutation hook for sending a message and getting AI response
+ */
 export function useSendMessage() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: async ({ messages, userPrompt, conversationId }: ChatServiceOptions) => {
+    mutationFn: async (options: ChatServiceOptions) => {
+      const { userPrompt, conversationId } = options
+      
       // Create user message for immediate UI update
       const userMessage: ChatMessage = {
         id: Date.now().toString(),
@@ -31,55 +37,84 @@ export function useSendMessage() {
 
       // Optimistically update the messages cache if we have a conversation ID
       if (conversationId) {
-        const queryKey = getConversationMessagesQueryKey(conversationId)
+        const queryKey = queryKeys.message.list(conversationId)
         queryClient.setQueryData<ChatMessage[]>(queryKey, (old) =>
           old ? [...old, userMessage] : [userMessage]
         )
       }
 
       // Call the API
-      const result = await chatService.getAIResponse({ messages, userPrompt, conversationId })
+      const result = await chatApi.sendMessage(options)
       
-      return { result, userMessage, conversationId }
+      return { result, userMessage, originalConversationId: conversationId }
     },
-    onSuccess: ({ result, userMessage, conversationId: originalConversationId }) => {
-      if ('errorMessage' in result) {
-        // Handle error case
-        const finalConversationId = originalConversationId || 1 // fallback
-        const queryKey = getConversationMessagesQueryKey(finalConversationId)
-        
-        queryClient.setQueryData<ChatMessage[]>(queryKey, (old) =>
-          old ? [...old, result.errorMessage] : [userMessage, result.errorMessage]
-        )
-      } else {
-        // Handle success case
-        const { aiMessage, conversationId: resultConversationId, titleGenerated } = result
-        const finalConversationId = resultConversationId || originalConversationId || 1
-        const queryKey = getConversationMessagesQueryKey(finalConversationId)
+    onSuccess: ({ result, userMessage, originalConversationId }) => {
+      const { aiMessage, conversationId: resultConversationId, titleGenerated } = result
+      const finalConversationId = resultConversationId || originalConversationId
+
+      if (finalConversationId) {
+        const queryKey = queryKeys.message.list(finalConversationId)
         
         // Update the messages cache
         queryClient.setQueryData<ChatMessage[]>(queryKey, (old) => {
           if (originalConversationId) {
-            // Existing conversation - add AI message
+            // Existing conversation - add AI message (user message already added optimistically)
             return old ? [...old, aiMessage] : [userMessage, aiMessage]
           } else {
             // New conversation - add both user and AI messages
             return [userMessage, aiMessage]
           }
         })
-        
-        // If a title was generated or it's a new conversation, invalidate conversations
-        if (titleGenerated || !originalConversationId) {
-          queryClient.invalidateQueries({ queryKey: CONVERSATIONS_QUERY_KEY })
-        }
+      }
+      
+      // If a title was generated or it's a new conversation, invalidate conversations
+      if (titleGenerated || !originalConversationId) {
+        queryClient.invalidateQueries({ 
+          queryKey: queryKeys.conversation.all() 
+        })
       }
     },
-    onError: (_, { conversationId }) => {
-      // On error, we might want to remove the optimistic update
+    onError: (error, { conversationId }) => {
+      console.error('Failed to send message:', error)
+      
+      // On error, invalidate the messages to remove optimistic update
       if (conversationId) {
-        const queryKey = getConversationMessagesQueryKey(conversationId)
-        queryClient.invalidateQueries({ queryKey })
+        queryClient.invalidateQueries({ 
+          queryKey: queryKeys.message.list(conversationId) 
+        })
       }
+      
+      // Could add toast notification here
     },
   })
+}
+
+/**
+ * Hook for managing optimistic message updates
+ */
+export function useOptimisticMessages(conversationId: number | null) {
+  const queryClient = useQueryClient()
+  
+  const addOptimisticMessage = (message: ChatMessage) => {
+    if (!conversationId) return
+    
+    const queryKey = queryKeys.message.list(conversationId)
+    queryClient.setQueryData<ChatMessage[]>(queryKey, (old) =>
+      old ? [...old, message] : [message]
+    )
+  }
+  
+  const removeOptimisticMessage = (messageId: string) => {
+    if (!conversationId) return
+    
+    const queryKey = queryKeys.message.list(conversationId)
+    queryClient.setQueryData<ChatMessage[]>(queryKey, (old) =>
+      old ? old.filter(msg => msg.id !== messageId) : []
+    )
+  }
+  
+  return {
+    addOptimisticMessage,
+    removeOptimisticMessage,
+  }
 }

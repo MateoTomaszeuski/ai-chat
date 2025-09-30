@@ -1,45 +1,86 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { chatService } from '../services/chatService'
+import { conversationApi } from '../services/api'
 import type { Conversation } from '../types/chat'
+import { queryKeys } from '../lib/queryKeys'
 
-export const CONVERSATIONS_QUERY_KEY = ['conversations']
-
+/**
+ * Query hook for fetching all conversations
+ */
 export function useConversations() {
   return useQuery({
-    queryKey: CONVERSATIONS_QUERY_KEY,
-    queryFn: () => chatService.getConversations(),
+    queryKey: queryKeys.conversation.lists(),
+    queryFn: conversationApi.getAll,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    gcTime: 1000 * 60 * 10, // 10 minutes (formerly cacheTime)
   })
 }
 
+/**
+ * Mutation hook for creating a new conversation
+ */
 export function useCreateConversation() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: () => chatService.createNewConversation(),
+    mutationFn: conversationApi.create,
     onSuccess: (newConversation) => {
-      if (newConversation) {
-        // Optimistically update the conversations cache
-        queryClient.setQueryData<Conversation[]>(CONVERSATIONS_QUERY_KEY, (old) => 
-          old ? [newConversation, ...old] : [newConversation]
-        )
-      }
+      // Optimistically update the conversations cache
+      queryClient.setQueryData<Conversation[]>(queryKeys.conversation.lists(), (old) => 
+        old ? [newConversation, ...old] : [newConversation]
+      )
+    },
+    onError: (error) => {
+      console.error('Failed to create conversation:', error)
+      // Could add toast notification here
     },
   })
 }
 
+/**
+ * Mutation hook for deleting a conversation
+ */
 export function useDeleteConversation() {
   const queryClient = useQueryClient()
   
   return useMutation({
-    mutationFn: (conversationId: number) => chatService.deleteConversation(conversationId),
-    onSuccess: (success, conversationId) => {
-      if (success) {
-        // Remove the conversation from the cache
-        queryClient.setQueryData<Conversation[]>(CONVERSATIONS_QUERY_KEY, (old) =>
-          old ? old.filter(conv => conv.id !== conversationId) : []
-        )
-      }
+    mutationFn: conversationApi.delete,
+    onSuccess: (_, conversationId) => {
+      // Remove the conversation from the cache
+      queryClient.setQueryData<Conversation[]>(queryKeys.conversation.lists(), (old) =>
+        old ? old.filter(conv => conv.id !== conversationId) : []
+      )
+      
+      // Remove all related message queries
+      queryClient.removeQueries({ 
+        queryKey: queryKeys.message.list(conversationId) 
+      })
+      
+      // Remove any chat session data
+      queryClient.removeQueries({
+        queryKey: queryKeys.chatSession.session(conversationId)
+      })
     },
+    onError: (error) => {
+      console.error('Failed to delete conversation:', error)
+      // Could add toast notification here
+    },
+  })
+}
+
+/**
+ * Hook to get a specific conversation (if we need it later)
+ */
+export function useConversation(conversationId: number) {
+  const queryClient = useQueryClient()
+  
+  return useQuery({
+    queryKey: queryKeys.conversation.detail(conversationId),
+    queryFn: async () => {
+      // This would need a specific API endpoint
+      // For now, we can derive it from the conversations list
+      const conversations = queryClient.getQueryData<Conversation[]>(queryKeys.conversation.lists())
+      return conversations?.find((conv: Conversation) => conv.id === conversationId) || null
+    },
+    enabled: !!conversationId,
   })
 }
