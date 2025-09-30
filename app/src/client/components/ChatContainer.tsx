@@ -19,7 +19,7 @@ export function ChatContainer({ messages, loading }: ChatContainerProps) {
   }, [messages]);
 
   return (
-    <div className="chat-container" ref={chatContainerRef}>
+    <div className="chat-container h-full" ref={chatContainerRef}>
       {messages.length === 0 ? (
         <div className="empty-chat">
           Start a conversation by typing a message below

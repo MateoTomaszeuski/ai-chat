@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import type { ReactNode } from "react";
 import { ChatContext } from "./ChatContext";
 import type { ChatContextType } from "./ChatContext";
+import type { ChatMessage } from "../types/chat";
 import { 
   useConversations, 
   useCreateConversation, 
@@ -18,6 +19,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const [currentConversationId, setCurrentConversationId] = useState<number | null>(null);
   const [lastUserPrompt, setLastUserPrompt] = useState("");
   const [aiResponse, setAiResponse] = useState("");
+  const [pendingUserMessage, setPendingUserMessage] = useState<ChatMessage | null>(null);
 
   // TanStack Query hooks
   const conversationsQuery = useConversations();
@@ -28,8 +30,23 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
   // Derived state from queries
   const conversations = conversationsQuery.data || [];
-  const messages = conversationMessagesQuery.data || [];
   const loading = sendMessageMutation.isPending || conversationMessagesQuery.isLoading;
+
+  const queryMessages = useMemo(() => {
+    return conversationMessagesQuery.data || [];
+  }, [conversationMessagesQuery.data]);
+
+  // Combine query messages with pending user message for immediate display
+  const messages = useMemo(() => {
+    const baseMessages = [...queryMessages];
+    
+    // If we have a pending user message and it's not already in the messages, add it
+    if (pendingUserMessage && !baseMessages.some(msg => msg.id === pendingUserMessage.id)) {
+      baseMessages.push(pendingUserMessage);
+    }
+    
+    return baseMessages;
+  }, [queryMessages, pendingUserMessage]);
 
   const createNewConversation = async () => {
     try {
@@ -38,6 +55,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         setCurrentConversationId(result.id);
         setLastUserPrompt("");
         setAiResponse("");
+        setPendingUserMessage(null);
       }
     } catch (error) {
       console.error("Error creating conversation:", error);
@@ -48,6 +66,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     setCurrentConversationId(conversationId);
     setLastUserPrompt("");
     setAiResponse("");
+    setPendingUserMessage(null);
   };
 
   const getAIResponse = async (userPrompt: string): Promise<void> => {
@@ -55,9 +74,22 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
     setLastUserPrompt(userPrompt);
 
+    // Create user message for immediate display
+    const userMessage: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      content: userPrompt,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+
+    // Show user message immediately if we don't have a conversation ID
+    if (!currentConversationId) {
+      setPendingUserMessage(userMessage);
+    }
+
     try {
       const result = await sendMessageMutation.mutateAsync({
-        messages,
+        messages: queryMessages,
         userPrompt,
         conversationId: currentConversationId || undefined
       });
@@ -66,6 +98,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       const { aiMessage, conversationId: resultConversationId } = result.result;
       setAiResponse(aiMessage.content);
       
+      // Clear pending message since it's now handled by the query cache
+      setPendingUserMessage(null);
+      
       // Update current conversation ID if it was created
       if (!currentConversationId && resultConversationId) {
         setCurrentConversationId(resultConversationId);
@@ -73,6 +108,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     } catch (error) {
       const errorText = "Error: Service unavailable";
       setAiResponse(errorText);
+      setPendingUserMessage(null); // Clear pending message on error
       console.error("Chat error:", error);
     }
   };
@@ -86,6 +122,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
         setCurrentConversationId(null);
         setLastUserPrompt("");
         setAiResponse("");
+        setPendingUserMessage(null);
       }
     } catch (error) {
       console.error("Error deleting conversation:", error);
@@ -96,6 +133,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     setCurrentConversationId(null);
     setLastUserPrompt("");
     setAiResponse("");
+    setPendingUserMessage(null);
   };
 
   const loadConversations = async () => {
