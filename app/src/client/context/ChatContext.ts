@@ -10,7 +10,7 @@ export interface ChatContextType {
   currentConversationId: number | null;
   
   // AI interaction
-  getAIResponse: (userPrompt: string) => Promise<void>;
+  getAIResponse: (userPrompt: string, forceNewConversation?: boolean) => Promise<void>;
   lastUserPrompt: string;
   aiResponse: string;
   
@@ -18,7 +18,7 @@ export interface ChatContextType {
   loading: boolean;
   
   // Conversation management
-  loadConversation: (conversationId: number) => Promise<void>;
+  loadConversation: (conversationId: number) => void;
   createNewConversation: () => Promise<void>;
   loadConversations: () => Promise<void>;
   deleteConversation: (conversationId: number) => Promise<void>;

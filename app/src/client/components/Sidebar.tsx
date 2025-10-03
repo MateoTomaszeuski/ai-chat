@@ -1,23 +1,25 @@
+import { useNavigate, useParams } from "react-router";
 import { useChatContext } from "../context/ChatContext";
 import type { Conversation } from "../types/chat";
 
 export function Sidebar() {
+  const navigate = useNavigate();
+  const { conversationId } = useParams<{ conversationId: string }>();
   const { 
     conversations, 
-    currentConversationId, 
-    loadConversation, 
-    createNewConversation,
-    deleteConversation
+    deleteConversation,
+    clearMessages
   } = useChatContext();
 
+  const currentConversationId = conversationId ? parseInt(conversationId, 10) : null;
+
   const handleConversationClick = (conversationId: number) => {
-    if (conversationId !== currentConversationId) {
-      loadConversation(conversationId);
-    }
+    navigate(`/chat/${conversationId}`);
   };
 
   const handleNewChat = () => {
-    createNewConversation();
+    clearMessages(); // Clear the current conversation state
+    navigate('/', { replace: true }); // Navigate to home page
   };
 
   const handleDeleteConversation = (e: React.MouseEvent, conversationId: number) => {

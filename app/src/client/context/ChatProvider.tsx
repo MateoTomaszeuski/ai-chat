@@ -62,14 +62,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
     }
   };
 
-  const loadConversation = async (conversationId: number) => {
+  const loadConversation = (conversationId: number) => {
     setCurrentConversationId(conversationId);
     setLastUserPrompt("");
     setAiResponse("");
     setPendingUserMessage(null);
   };
 
-  const getAIResponse = async (userPrompt: string): Promise<void> => {
+  const getAIResponse = async (userPrompt: string, forceNewConversation: boolean = false): Promise<void> => {
     if (!userPrompt.trim() || loading) return;
 
     setLastUserPrompt(userPrompt);
@@ -82,16 +82,14 @@ export function ChatProvider({ children }: ChatProviderProps) {
       timestamp: new Date(),
     };
 
-    // Show user message immediately if we don't have a conversation ID
-    if (!currentConversationId) {
-      setPendingUserMessage(userMessage);
-    }
+    // Always show user message immediately when starting a new conversation or if no current conversation
+    setPendingUserMessage(userMessage);
 
     try {
       const result = await sendMessageMutation.mutateAsync({
         messages: queryMessages,
         userPrompt,
-        conversationId: currentConversationId || undefined
+        conversationId: forceNewConversation ? undefined : (currentConversationId || undefined)
       });
 
       // The new API structure returns the response directly
@@ -101,8 +99,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
       // Clear pending message since it's now handled by the query cache
       setPendingUserMessage(null);
       
-      // Update current conversation ID if it was created
-      if (!currentConversationId && resultConversationId) {
+      // Update current conversation ID if it was created or if we're forcing a new conversation
+      if (resultConversationId) {
+        console.log('Setting conversation ID to:', resultConversationId, 'forceNew:', forceNewConversation);
         setCurrentConversationId(resultConversationId);
       }
     } catch (error) {
