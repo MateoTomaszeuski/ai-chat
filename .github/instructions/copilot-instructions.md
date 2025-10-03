@@ -8,7 +8,9 @@ applyTo: '**'
 - Do not add extra comments, only when the code is really complex and might be necessary.
 - Use tailwind v4 for styling.
     - Ignore the @apply linting errors, we want to use it.
-    
+- Use pnpm not npm or yarn.
+- Use React and Typescript.
+- Use functional components and hooks.
 - When doing UI/UX follow these rules:
     - Use Tailwind CSS for styling.
     - Start by designing features

@@ -21,14 +21,64 @@ export interface ChatServiceError {
   errorMessage: ChatMessage;
 }
 
+/**
+ * Helper function to handle API responses and provide descriptive error messages
+ */
+async function handleApiResponse<T>(response: Response, operation: string): Promise<T> {
+  if (!response.ok) {
+    let errorMessage = `Failed to ${operation}`;
+    
+    try {
+      // Try to get error details from response body
+      const errorData = await response.json();
+      if (errorData.error || errorData.message) {
+        errorMessage = errorData.error || errorData.message;
+      }
+    } catch {
+      // If we can't parse the error response, use status-based messages
+      switch (response.status) {
+        case 400:
+          errorMessage = `Invalid request: ${operation}`;
+          break;
+        case 401:
+          errorMessage = 'Authentication required';
+          break;
+        case 403:
+          errorMessage = 'You don\'t have permission to perform this action';
+          break;
+        case 404:
+          errorMessage = 'The requested resource was not found';
+          break;
+        case 409:
+          errorMessage = 'This action conflicts with the current state';
+          break;
+        case 429:
+          errorMessage = 'Too many requests. Please wait a moment before trying again';
+          break;
+        case 500:
+          errorMessage = 'Server error occurred. Please try again later';
+          break;
+        case 502:
+        case 503:
+        case 504:
+          errorMessage = 'Service temporarily unavailable. Please try again later';
+          break;
+        default:
+          errorMessage = `${operation} failed (${response.status})`;
+      }
+    }
+    
+    throw new Error(errorMessage);
+  }
+  
+  return response.json();
+}
+
 // Conversation API functions
 export const conversationApi = {
   async getAll(): Promise<Conversation[]> {
     const response = await fetch("/api/conversations");
-    if (!response.ok) {
-      throw new Error(`Failed to fetch conversations: ${response.statusText}`);
-    }
-    return response.json();
+    return handleApiResponse<Conversation[]>(response, "load conversations");
   },
 
   async create(): Promise<Conversation> {
@@ -36,37 +86,31 @@ export const conversationApi = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
     });
-    if (!response.ok) {
-      throw new Error(`Failed to create conversation: ${response.statusText}`);
-    }
-    return response.json();
+    return handleApiResponse<Conversation>(response, "create new conversation");
   },
 
   async delete(conversationId: number): Promise<void> {
     const response = await fetch(`/api/conversations/${conversationId}`, {
       method: "DELETE",
     });
-    if (!response.ok) {
-      throw new Error(`Failed to delete conversation: ${response.statusText}`);
-    }
+    await handleApiResponse<void>(response, "delete conversation");
   },
 };
+
+interface DbMessage {
+  id: number;
+  message_content: string;
+  message_type_id: number;
+  created_at: string;
+}
 
 // Message API functions
 export const messageApi = {
   async getByConversation(conversationId: number): Promise<ChatMessage[]> {
     const response = await fetch(`/api/conversations/${conversationId}/messages`);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch messages: ${response.statusText}`);
-    }
+    const dbMessages = await handleApiResponse<DbMessage[]>(response, "load conversation messages");
     
-    const dbMessages = await response.json();
-    return dbMessages.map((msg: { 
-      id: number; 
-      message_content: string; 
-      message_type_id: number; 
-      created_at: string 
-    }) => ({
+    return dbMessages.map((msg) => ({
       id: msg.id.toString(),
       content: msg.message_content,
       sender: msg.message_type_id === 1 ? 'user' as const : 'ai' as const,
@@ -75,11 +119,18 @@ export const messageApi = {
   },
 };
 
+interface ChatApiResponse {
+  response?: string;
+  error?: string;
+  conversationId?: number;
+  titleGenerated?: boolean;
+}
+
 // Chat API functions
 export const chatApi = {
   async sendMessage({ messages, userPrompt, conversationId }: ChatServiceOptions): Promise<ChatServiceResponse> {
     if (!userPrompt.trim()) {
-      throw new Error("User prompt cannot be empty");
+      throw new Error("Message cannot be empty. Please type something before sending.");
     }
 
     // Create user message for API call
@@ -108,12 +159,14 @@ export const chatApi = {
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Failed to send message: ${response.statusText}`);
+    const data = await handleApiResponse<ChatApiResponse>(response, "send message to AI");
+    
+    // Handle AI service errors in the response
+    if (data.error) {
+      throw new Error(data.error);
     }
-
-    const data = await response.json();
-    const aiResponseText = data.response || data.error || "No response received";
+    
+    const aiResponseText = data.response || "No response received from AI";
 
     const aiMessage: ChatMessage = {
       id: Date.now().toString() + "_ai",

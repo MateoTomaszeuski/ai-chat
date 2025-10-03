@@ -84,7 +84,7 @@ export function useSendMessage() {
         })
       }
       
-      // Could add toast notification here
+      // Error toast is handled globally by the QueryClient
     },
   })
 }

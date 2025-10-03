@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { conversationApi } from '../services/api'
 import type { Conversation } from '../types/chat'
 import { queryKeys } from '../lib/queryKeys'
+import { customToast } from '../lib/toast'
 
 /**
  * Query hook for fetching all conversations
@@ -28,10 +29,11 @@ export function useCreateConversation() {
       queryClient.setQueryData<Conversation[]>(queryKeys.conversation.lists(), (old) => 
         old ? [newConversation, ...old] : [newConversation]
       )
+      // Success feedback is provided by the UI showing the new conversation
     },
     onError: (error) => {
       console.error('Failed to create conversation:', error)
-      // Could add toast notification here
+      // Error toast is handled globally
     },
   })
 }
@@ -59,10 +61,13 @@ export function useDeleteConversation() {
       queryClient.removeQueries({
         queryKey: queryKeys.chatSession.session(conversationId)
       })
+      
+      // Show success message
+      customToast.success('Conversation deleted successfully')
     },
     onError: (error) => {
       console.error('Failed to delete conversation:', error)
-      // Could add toast notification here
+      // Error toast is handled globally
     },
   })
 }

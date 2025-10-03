@@ -19,10 +19,6 @@ export const createQueryClient = () => {
       mutations: {
         // Retry failed mutations once
         retry: 1,
-        // Log mutation errors
-        onError: (error, variables, context) => {
-          console.error('Mutation error:', { error, variables, context })
-        },
       },
     },
   })
