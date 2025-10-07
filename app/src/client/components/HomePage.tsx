@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { useAuth } from "react-oidc-context";
 import { MessageInput } from "./MessageInput";
 import { useChatContext } from "../context";
 import { useNavigate } from "react-router";
 
 export function HomePage() {
+  const auth = useAuth();
   const { getAIResponse, loading, clearMessages, currentConversationId } = useChatContext();
   const navigate = useNavigate();
   const [isSendingMessage, setIsSendingMessage] = useState(false);
@@ -18,6 +20,12 @@ export function HomePage() {
   }, [currentConversationId, navigate, isSendingMessage]);
 
   const handleSendMessage = async (userPrompt: string) => {
+    // Check if user is authenticated before allowing message sending
+    if (!auth.isAuthenticated) {
+      auth.signinRedirect();
+      return;
+    }
+
     try {
       // Set flag that we're sending a message (so we should navigate when conversation is created)
       setIsSendingMessage(true);
@@ -61,6 +69,15 @@ export function HomePage() {
           <p className="text-lg text-gray-600 mb-8">
             Start a conversation with AI. Ask questions, get help, or just chat about anything on your mind.
           </p>
+          
+          {/* Show authentication status */}
+          {!auth.isAuthenticated && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-blue-800 text-sm">
+                Please log in using the sidebar to start chatting with AI.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Example prompts */}
@@ -69,22 +86,30 @@ export function HomePage() {
             Try asking about:
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-white p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+            <div className={`bg-white p-4 rounded-lg border border-gray-200 transition-colors cursor-pointer ${
+              auth.isAuthenticated ? 'hover:border-gray-300' : 'opacity-75 hover:opacity-100'
+            }`}
                  onClick={() => handleSendMessage("Explain quantum computing in simple terms")}>
               <div className="text-sm font-medium text-gray-900">Science & Technology</div>
               <div className="text-sm text-gray-600 mt-1">Explain quantum computing in simple terms</div>
             </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+            <div className={`bg-white p-4 rounded-lg border border-gray-200 transition-colors cursor-pointer ${
+              auth.isAuthenticated ? 'hover:border-gray-300' : 'opacity-75 hover:opacity-100'
+            }`}
                  onClick={() => handleSendMessage("Help me plan a weekend trip")}>
               <div className="text-sm font-medium text-gray-900">Travel & Planning</div>
               <div className="text-sm text-gray-600 mt-1">Help me plan a weekend trip</div>
             </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+            <div className={`bg-white p-4 rounded-lg border border-gray-200 transition-colors cursor-pointer ${
+              auth.isAuthenticated ? 'hover:border-gray-300' : 'opacity-75 hover:opacity-100'
+            }`}
                  onClick={() => handleSendMessage("Write a creative story about space exploration")}>
               <div className="text-sm font-medium text-gray-900">Creative Writing</div>
               <div className="text-sm text-gray-600 mt-1">Write a creative story about space exploration</div>
             </div>
-            <div className="bg-white p-4 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+            <div className={`bg-white p-4 rounded-lg border border-gray-200 transition-colors cursor-pointer ${
+              auth.isAuthenticated ? 'hover:border-gray-300' : 'opacity-75 hover:opacity-100'
+            }`}
                  onClick={() => handleSendMessage("What are some healthy meal prep ideas?")}>
               <div className="text-sm font-medium text-gray-900">Health & Lifestyle</div>
               <div className="text-sm text-gray-600 mt-1">What are some healthy meal prep ideas?</div>

@@ -2,9 +2,10 @@ import { useEffect } from "react";
 import { useParams, useNavigate } from "react-router";
 import { ChatContainer } from "./ChatContainer";
 import { MessageInput } from "./MessageInput";
+import { ProtectedRoute } from "./ProtectedRoute";
 import { useChatContext } from "../context";
 
-export function ChatPage() {
+function ChatPageContent() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
   const { 
@@ -60,5 +61,13 @@ export function ChatPage() {
         <MessageInput onSendMessage={handleSendMessage} loading={loading} />
       </div>
     </div>
+  );
+}
+
+export function ChatPage() {
+  return (
+    <ProtectedRoute>
+      <ChatPageContent />
+    </ProtectedRoute>
   );
 }
