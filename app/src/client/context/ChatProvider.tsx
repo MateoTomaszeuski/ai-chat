@@ -82,8 +82,11 @@ export function ChatProvider({ children }: ChatProviderProps) {
       timestamp: new Date(),
     };
 
-    // Always show user message immediately when starting a new conversation or if no current conversation
-    setPendingUserMessage(userMessage);
+    // Only show pending user message for new conversations
+    // For existing conversations, the optimistic update in useSendMessage will handle it
+    if (!currentConversationId || forceNewConversation) {
+      setPendingUserMessage(userMessage);
+    }
 
     try {
       const result = await sendMessageMutation.mutateAsync({
