@@ -11,9 +11,20 @@ INSERT INTO message_types (id, message_type) VALUES
 (3, 'Conversation Summary')
 ON CONFLICT (id) DO NOTHING;
 
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  user_id TEXT UNIQUE NOT NULL, -- OIDC sub claim
+  email TEXT,
+  name TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_login TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 -- Conversations table
 CREATE TABLE IF NOT EXISTS conversations (
   id SERIAL PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   title TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

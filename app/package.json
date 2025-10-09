@@ -18,6 +18,7 @@
     "dompurify": "^3.2.7",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
+    "jose": "^6.1.0",
     "katex": "^0.16.23",
     "marked": "^16.3.0",
     "oidc-client-ts": "^3.3.0",

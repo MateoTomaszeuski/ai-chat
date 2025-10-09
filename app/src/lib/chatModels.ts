@@ -1,12 +1,32 @@
 import z from "zod";
 
+// User schemas
+export const CreateUserSchema = z.object({
+  user_id: z.string().min(1, "user_id required"),
+  email: z.string().email().optional(),
+  name: z.string().optional(),
+});
+
+export const UserRowSchema = z.object({
+  id: z.number().int().positive(),
+  user_id: z.string(),
+  email: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  created_at: z.coerce.string(),
+  last_login: z.coerce.string(),
+});
+
+export type User = z.infer<typeof UserRowSchema>;
+
 // Conversation schemas
 export const CreateConversationSchema = z.object({
+  user_id: z.string().min(1, "user_id required"),
   title: z.string().min(1, "title required").max(200),
 });
 
 export const ConversationRowSchema = z.object({
   id: z.number().int().positive(),
+  user_id: z.string(),
   title: z.string(),
   created_at: z.coerce.string(),
 });

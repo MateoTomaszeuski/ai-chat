@@ -5,6 +5,8 @@ import pgPromise from "pg-promise";
 import { readFile } from "node:fs/promises";
 import { AIService, ChatRequest } from "./services/aiService";
 import { chatDBService } from "./services/chatDBService";
+import { authService, requireAuth } from "./middleware/auth";
+import { getAuthConfig } from "./config/auth";
 
 const pgp = pgPromise({});
 const connectionString = process.env.DATABASE_URL;
@@ -15,6 +17,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Initialize authentication service
+try {
+  const authConfig = getAuthConfig();
+  authService.initialize(authConfig);
+  console.log('Authentication service initialized successfully');
+} catch (error) {
+  console.warn('Authentication service initialization failed:', error);
+  console.warn('Running without authentication - all endpoints will be unprotected');
+}
+
 // Initialize AI Service
 const aiService = new AIService();
 
@@ -23,9 +35,16 @@ app.get("/api/health", (_req, res) => {
 });
 
 // Get all conversations
-app.get("/api/conversations", async (_req, res, next) => {
+app.get("/api/conversations", requireAuth, async (req, res, next) => {
   try {
-    const conversations = await chatDBService.getAllConversations();
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Ensure user exists in database
+    await chatDBService.ensureUser(req.user.sub, req.user.email, req.user.name);
+    
+    const conversations = await chatDBService.getAllConversations(req.user.sub);
     res.json(conversations);
   } catch (err) {
     next(err);
@@ -33,9 +52,16 @@ app.get("/api/conversations", async (_req, res, next) => {
 });
 
 // Create new conversation
-app.post("/api/conversations", async (_req, res, next) => {
+app.post("/api/conversations", requireAuth, async (req, res, next) => {
   try {
-    const conversation = await chatDBService.createNewConversation();
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Ensure user exists in database
+    await chatDBService.ensureUser(req.user.sub, req.user.email, req.user.name);
+    
+    const conversation = await chatDBService.createNewConversation(req.user.sub);
     res.json(conversation);
   } catch (err) {
     next(err);
@@ -43,14 +69,18 @@ app.post("/api/conversations", async (_req, res, next) => {
 });
 
 // Get messages for a specific conversation
-app.get("/api/conversations/:id/messages", async (req, res, next) => {
+app.get("/api/conversations/:id/messages", requireAuth, async (req, res, next) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
     const conversationId = parseInt(req.params.id);
     if (isNaN(conversationId)) {
       return res.status(400).json({ error: "Invalid conversation ID" });
     }
     
-    const messages = await chatDBService.getConversationMessages(conversationId);
+    const messages = await chatDBService.getConversationMessages(conversationId, req.user.sub);
     res.json(messages);
   } catch (err) {
     next(err);
@@ -58,14 +88,18 @@ app.get("/api/conversations/:id/messages", async (req, res, next) => {
 });
 
 // Delete a specific conversation
-app.delete("/api/conversations/:id", async (req, res, next) => {
+app.delete("/api/conversations/:id", requireAuth, async (req, res, next) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
     const conversationId = parseInt(req.params.id);
     if (isNaN(conversationId)) {
       return res.status(400).json({ error: "Invalid conversation ID" });
     }
     
-    const deleted = await chatDBService.deleteConversation(conversationId);
+    const deleted = await chatDBService.deleteConversation(conversationId, req.user.sub);
     if (deleted) {
       res.json({ success: true, message: "Conversation deleted successfully" });
     } else {
@@ -76,8 +110,15 @@ app.delete("/api/conversations/:id", async (req, res, next) => {
   }
 });
 
-app.post("/api/chat", async (req, res, next) => {
+app.post("/api/chat", requireAuth, async (req, res, next) => {
   try {
+    if (!req.user) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Ensure user exists in database
+    await chatDBService.ensureUser(req.user.sub, req.user.email, req.user.name);
+
     const parsed = ChatRequest.parse(req.body);
     const messages = parsed.messages;
     const conversationId = req.body.conversationId;
@@ -85,14 +126,14 @@ app.post("/api/chat", async (req, res, next) => {
     let conversation;
     
     if (conversationId) {
-      // Use existing conversation
-      conversation = await chatDBService.getConversationById(conversationId);
+      // Use existing conversation (with user ownership verification)
+      conversation = await chatDBService.getConversationById(conversationId, req.user.sub);
       if (!conversation) {
         return res.status(404).json({ error: "Conversation not found" });
       }
     } else {
       // Create new conversation
-      conversation = await chatDBService.createNewConversation();
+      conversation = await chatDBService.createNewConversation(req.user.sub);
     }
     
     // Get the last user message (the new one being sent)

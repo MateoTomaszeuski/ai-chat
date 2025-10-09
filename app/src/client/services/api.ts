@@ -1,4 +1,5 @@
 import type { ChatMessage, Conversation } from "../types/chat";
+import { getAuthHeadersFromStorage } from "../lib/auth";
 
 /**
  * API service functions - pure functions for making HTTP requests
@@ -77,14 +78,16 @@ async function handleApiResponse<T>(response: Response, operation: string): Prom
 // Conversation API functions
 export const conversationApi = {
   async getAll(): Promise<Conversation[]> {
-    const response = await fetch("/api/conversations");
+    const response = await fetch("/api/conversations", {
+      headers: getAuthHeadersFromStorage(),
+    });
     return handleApiResponse<Conversation[]>(response, "load conversations");
   },
 
   async create(): Promise<Conversation> {
     const response = await fetch("/api/conversations", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeadersFromStorage(),
     });
     return handleApiResponse<Conversation>(response, "create new conversation");
   },
@@ -92,6 +95,7 @@ export const conversationApi = {
   async delete(conversationId: number): Promise<void> {
     const response = await fetch(`/api/conversations/${conversationId}`, {
       method: "DELETE",
+      headers: getAuthHeadersFromStorage(),
     });
     await handleApiResponse<void>(response, "delete conversation");
   },
@@ -107,7 +111,9 @@ interface DbMessage {
 // Message API functions
 export const messageApi = {
   async getByConversation(conversationId: number): Promise<ChatMessage[]> {
-    const response = await fetch(`/api/conversations/${conversationId}/messages`);
+    const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+      headers: getAuthHeadersFromStorage(),
+    });
     const dbMessages = await handleApiResponse<DbMessage[]>(response, "load conversation messages");
     
     return dbMessages.map((msg) => ({
@@ -150,9 +156,7 @@ export const chatApi = {
 
     const response = await fetch("/api/chat", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: getAuthHeadersFromStorage(),
       body: JSON.stringify({ 
         messages: messagesToSend,
         conversationId 
