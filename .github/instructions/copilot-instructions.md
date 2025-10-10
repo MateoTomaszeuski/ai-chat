@@ -5,6 +5,8 @@ applyTo: '**'
 - Do not go out of your way doing extra files like
     - example files
     - summary files
+    - test files
+    - read me files
 - Do not add extra comments, only when the code is really complex and might be necessary.
 - Use tailwind v4 for styling.
     - Ignore the @apply linting errors, we want to use it.

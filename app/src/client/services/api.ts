@@ -1,5 +1,6 @@
 import type { ChatMessage, Conversation } from "../types/chat";
 import { getAuthHeadersFromStorage } from "../lib/auth";
+import { availableTools } from "../lib/aiTools";
 
 /**
  * API service functions - pure functions for making HTTP requests
@@ -159,7 +160,8 @@ export const chatApi = {
       headers: getAuthHeadersFromStorage(),
       body: JSON.stringify({ 
         messages: messagesToSend,
-        conversationId 
+        conversationId,
+        tools: availableTools // Send available AI tools to backend
       }),
     });
 

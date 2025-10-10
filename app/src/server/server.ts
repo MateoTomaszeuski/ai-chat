@@ -122,6 +122,22 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
     const parsed = ChatRequest.parse(req.body);
     const messages = parsed.messages;
     const conversationId = req.body.conversationId;
+    const tools = req.body.tools;
+    
+    // Log available AI tools sent from frontend
+    if (tools && Array.isArray(tools)) {
+      console.log(`\n=== AI Tools Available (${tools.length} tools) ===`);
+      tools.forEach((tool: { function?: { name?: string; description?: string; parameters?: unknown } }, index: number) => {
+        if (tool.function) {
+          console.log(`${index + 1}. ${tool.function.name}`);
+          console.log(`   Description: ${tool.function.description}`);
+          console.log(`   Parameters:`, JSON.stringify(tool.function.parameters, null, 2));
+        }
+      });
+      console.log('=== End Tools List ===\n');
+    } else {
+      console.log('No AI tools provided in request');
+    }
     
     let conversation;
     

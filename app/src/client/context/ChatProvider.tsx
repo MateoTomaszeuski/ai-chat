@@ -8,8 +8,10 @@ import {
   useCreateConversation, 
   useDeleteConversation,
   useConversationMessages,
-  useSendMessage
+  useSendMessage,
+  useChatBackground
 } from "../hooks";
+import { parseToolCalls, executeToolCall } from "../lib/aiTools";
 
 interface ChatProviderProps {
   children: ReactNode;
@@ -27,6 +29,9 @@ export function ChatProvider({ children }: ChatProviderProps) {
   const deleteConversationMutation = useDeleteConversation();
   const conversationMessagesQuery = useConversationMessages(currentConversationId);
   const sendMessageMutation = useSendMessage();
+  
+  // Get background color setter for AI tools
+  const [, setBackgroundColor] = useChatBackground();
 
   // Derived state from queries
   const conversations = conversationsQuery.data || [];
@@ -97,7 +102,28 @@ export function ChatProvider({ children }: ChatProviderProps) {
 
       // The new API structure returns the response directly
       const { aiMessage, conversationId: resultConversationId } = result.result;
-      setAiResponse(aiMessage.content);
+      
+      // Parse the AI response for tool calls
+      const toolCalls = parseToolCalls(aiMessage.content);
+      
+      // Execute any tool calls found in the response
+      if (toolCalls.length > 0) {
+        console.log('Found tool calls in AI response:', toolCalls);
+        
+        for (const { toolName, args } of toolCalls) {
+          const toolResult = executeToolCall(toolName, args, {
+            setBackgroundColor,
+          });
+          
+          console.log(`Tool ${toolName} execution:`, toolResult);
+        }
+        
+        // Remove tool call markers from the displayed response
+        const cleanedResponse = aiMessage.content.replace(/\[TOOL:\w+\]\{[^}]+\}/g, '').trim();
+        setAiResponse(cleanedResponse || aiMessage.content);
+      } else {
+        setAiResponse(aiMessage.content);
+      }
       
       // Clear pending message since it's now handled by the query cache
       setPendingUserMessage(null);
