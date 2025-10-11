@@ -3,6 +3,7 @@ import { useAuth } from "react-oidc-context";
 import { MessageInput } from "./MessageInput";
 import { useChatContext } from "../context";
 import { useNavigate } from "react-router";
+import { RenderErrorButton } from "./RenderErrorButton";
 
 export function HomePage() {
   const auth = useAuth();
@@ -120,6 +121,11 @@ export function HomePage() {
         {/* Message Input */}
         <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
           <MessageInput onSendMessage={handleSendMessage} loading={loading} />
+        </div>
+
+        {/* Error Test Button */}
+        <div className="mt-4 text-center">
+          <RenderErrorButton />
         </div>
       </div>
     </div>

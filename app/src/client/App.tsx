@@ -5,6 +5,7 @@ import { HomePage } from "./components/HomePage";
 import { ChatPage } from "./components/ChatPage";
 import { AuthCallback } from "./components/AuthCallback";
 import { SilentRefresh } from "./components/SilentRefresh";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { ChatProvider } from "./context";
 import { useGlobalErrorHandler } from "./hooks";
 
@@ -13,31 +14,35 @@ function App() {
   useGlobalErrorHandler();
 
   return (
-    <BrowserRouter>
-      <ChatProvider>
-        <Routes>
-          <Route path="/callback" element={<AuthCallback />} />
-          <Route path="/silent-refresh" element={<SilentRefresh />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<HomePage />} />
-            <Route path="chat/:conversationId" element={<ChatPage />} />
-          </Route>
-        </Routes>
-        <Toaster 
-          position="top-right"
-          gutter={8}
-          containerClassName="z-50"
-          toastOptions={{
-            duration: Infinity,
-            style: {
-              background: 'transparent',
-              boxShadow: 'none',
-              padding: 0,
-            },
-          }}
-        />
-      </ChatProvider>
-    </BrowserRouter>
+    <>
+      <ErrorBoundary>
+        <BrowserRouter>
+          <ChatProvider>
+            <Routes>
+              <Route path="/callback" element={<AuthCallback />} />
+              <Route path="/silent-refresh" element={<SilentRefresh />} />
+              <Route path="/" element={<Layout />}>
+                <Route index element={<HomePage />} />
+                <Route path="chat/:conversationId" element={<ChatPage />} />
+              </Route>
+            </Routes>
+          </ChatProvider>
+        </BrowserRouter>
+      </ErrorBoundary>
+      <Toaster 
+        position="top-right"
+        gutter={8}
+        containerClassName="z-50"
+        toastOptions={{
+          duration: Infinity,
+          style: {
+            background: 'transparent',
+            boxShadow: 'none',
+            padding: 0,
+          },
+        }}
+      />
+    </>
   );
 }
 
