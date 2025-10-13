@@ -18,7 +18,7 @@ export class ChatDBService {
 
       // Try to get existing user
       let user = await db.oneOrNone<User>(
-        'SELECT id, email, name, created_at, last_login FROM users WHERE email = $1',
+        'SELECT id, email, name, is_admin, created_at, last_login FROM users WHERE email = $1',
         [email]
       );
 
@@ -31,21 +31,22 @@ export class ChatDBService {
         
         // Return updated user data
         user = await db.one<User>(
-          'SELECT id, email, name, created_at, last_login FROM users WHERE email = $1',
+          'SELECT id, email, name, is_admin, created_at, last_login FROM users WHERE email = $1',
           [email]
         );
         
-        console.log(`[DB] User ${email} logged in`);
+        console.log(`[DB] User ${email} logged in (admin: ${user.is_admin})`);
       } else {
         // Create new user
         const userData = CreateUserSchema.parse({
           email,
           name,
+          is_admin: false,
         });
 
         user = await db.one<User>(
-          'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name, created_at, last_login',
-          [userData.email, userData.name || null]
+          'INSERT INTO users (email, name, is_admin) VALUES ($1, $2, $3) RETURNING id, email, name, is_admin, created_at, last_login',
+          [userData.email, userData.name || null, userData.is_admin]
         );
         
         console.log(`[DB] New user created: ${email}`);
@@ -251,6 +252,78 @@ export class ChatDBService {
     } catch (error) {
       console.error('Error deleting conversation:', error);
       throw new Error('Failed to delete conversation');
+    }
+  }
+
+  // Check if user is admin
+  async isUserAdmin(userEmail: string): Promise<boolean> {
+    try {
+      if (!userEmail) {
+        return false;
+      }
+
+      const user = await db.oneOrNone<{ is_admin: boolean }>(
+        'SELECT is_admin FROM users WHERE email = $1',
+        [userEmail]
+      );
+
+      return user?.is_admin || false;
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  }
+
+  // Admin: Get all conversations from all users
+  async getAllConversationsForAdmin(): Promise<Array<Conversation & { user_name?: string }>> {
+    try {
+      const conversations = await db.any<Conversation & { user_name?: string }>(
+        `SELECT c.id, c.user_email, c.title, c.created_at, u.name as user_name 
+         FROM conversations c 
+         LEFT JOIN users u ON c.user_email = u.email 
+         ORDER BY c.created_at DESC`
+      );
+      
+      console.log(`[DB ADMIN] Retrieved all ${conversations.length} conversations`);
+      return conversations;
+    } catch (error) {
+      console.error('Error getting all conversations for admin:', error);
+      return [];
+    }
+  }
+
+  // Admin: Get conversation by ID (without ownership check) - READ ONLY
+  async getConversationByIdAdmin(conversationId: number): Promise<Conversation | null> {
+    try {
+      const conversation = await db.oneOrNone<Conversation>(
+        'SELECT id, user_email, title, created_at FROM conversations WHERE id = $1',
+        [conversationId]
+      );
+      
+      if (conversation) {
+        console.log(`[DB ADMIN] Retrieved conversation ${conversationId} for admin view`);
+      }
+      
+      return conversation;
+    } catch (error) {
+      console.error('Error getting conversation by ID for admin:', error);
+      return null;
+    }
+  }
+
+  // Admin: Get messages for any conversation (without ownership check) - READ ONLY
+  async getConversationMessagesAdmin(conversationId: number): Promise<Message[]> {
+    try {
+      const messages = await db.any<Message>(
+        'SELECT id, conversation_id, message_type_id, message_content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
+        [conversationId]
+      );
+      
+      console.log(`[DB ADMIN] Retrieved ${messages.length} messages from conversation ${conversationId} for admin view`);
+      return messages;
+    } catch (error) {
+      console.error('Error getting conversation messages for admin:', error);
+      throw new Error('Failed to get conversation messages');
     }
   }
 }

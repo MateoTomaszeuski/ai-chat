@@ -6,6 +6,7 @@ import { ChatPage } from "./components/ChatPage";
 import { AuthCallback } from "./components/AuthCallback";
 import { SilentRefresh } from "./components/SilentRefresh";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { AdminPanel } from "./components/AdminPanel";
 import { ChatProvider } from "./context";
 import { useGlobalErrorHandler } from "./hooks";
 
@@ -24,6 +25,7 @@ function App() {
               <Route path="/" element={<Layout />}>
                 <Route index element={<HomePage />} />
                 <Route path="chat/:conversationId" element={<ChatPage />} />
+                <Route path="admin" element={<AdminPanel />} />
               </Route>
             </Routes>
           </ChatProvider>

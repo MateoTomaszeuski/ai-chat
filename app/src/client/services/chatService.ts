@@ -1,4 +1,4 @@
-import type { ChatMessage, Conversation } from "../types/chat";
+import type { ChatMessage, Conversation, UserInfo } from "../types/chat";
 import { getAuthHeadersFromStorage } from "../lib/auth";
 
 export interface ChatServiceOptions {
@@ -18,6 +18,22 @@ export interface ChatServiceError {
 }
 
 export class ChatService {
+  async getCurrentUser(): Promise<UserInfo | null> {
+    try {
+      const headers = getAuthHeadersFromStorage();
+      const response = await fetch("/api/user/me", {
+        headers
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      return null;
+    } catch (error) {
+      console.error("Error fetching user info:", error);
+      return null;
+    }
+  }
+
   async getConversations(): Promise<Conversation[]> {
     try {
       const headers = getAuthHeadersFromStorage();
@@ -180,6 +196,26 @@ export class ChatService {
       };
       
       return { errorMessage };
+    }
+  }
+
+  // Admin: Get all conversations from all users
+  async getAllConversationsAdmin(): Promise<Conversation[]> {
+    try {
+      const headers = getAuthHeadersFromStorage();
+      const response = await fetch("/api/admin/conversations", {
+        headers
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      if (response.status === 403) {
+        console.error("Forbidden: Admin access required");
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching all conversations (admin):", error);
+      return [];
     }
   }
 }

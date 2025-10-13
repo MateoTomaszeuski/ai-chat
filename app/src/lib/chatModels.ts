@@ -4,12 +4,14 @@ import z from "zod";
 export const CreateUserSchema = z.object({
   email: z.string().email("Valid email required"),
   name: z.string().optional(),
+  is_admin: z.boolean().optional().default(false),
 });
 
 export const UserRowSchema = z.object({
   id: z.number().int().positive(),
   email: z.string().email(),
   name: z.string().nullable().optional(),
+  is_admin: z.boolean().default(false),
   created_at: z.coerce.string(),
   last_login: z.coerce.string(),
 });

@@ -3,6 +3,8 @@ import { useAuth } from "react-oidc-context";
 import { useChatContext } from "../context/ChatContext";
 import { LoginButton } from "./LoginButton";
 import type { Conversation } from "../types/chat";
+import { useEffect, useState } from "react";
+import { chatService } from "../services/chatService";
 
 export function Sidebar() {
   const auth = useAuth();
@@ -13,8 +15,21 @@ export function Sidebar() {
     deleteConversation,
     clearMessages
   } = useChatContext();
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const currentConversationId = conversationId ? parseInt(conversationId, 10) : null;
+
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (auth.isAuthenticated) {
+        const userInfo = await chatService.getCurrentUser();
+        setIsAdmin(userInfo?.is_admin || false);
+      } else {
+        setIsAdmin(false);
+      }
+    };
+    checkAdminStatus();
+  }, [auth.isAuthenticated]);
 
   const handleConversationClick = (conversationId: number) => {
     navigate(`/chat/${conversationId}`);
@@ -23,6 +38,10 @@ export function Sidebar() {
   const handleNewChat = () => {
     clearMessages(); // Clear the current conversation state
     navigate('/', { replace: true }); // Navigate to home page
+  };
+
+  const handleAdminPanel = () => {
+    navigate('/admin');
   };
 
   const handleDeleteConversation = (e: React.MouseEvent, conversationId: number) => {
@@ -35,14 +54,31 @@ export function Sidebar() {
   return (
     <div className="w-64 bg-gray-900 text-white flex flex-col h-full">
       {/* Header */}
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-gray-700 space-y-2">
         {auth.isAuthenticated ? (
-          <button
-            onClick={handleNewChat}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors duration-200 font-medium"
-          >
-            + New Chat
-          </button>
+          <>
+            {!isAdmin && (
+              <button
+                onClick={handleNewChat}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors duration-200 font-medium"
+              >
+                + New Chat
+              </button>
+            )}
+            {isAdmin && (
+              <>
+                <button
+                  onClick={handleAdminPanel}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition-colors duration-200 font-medium"
+                >
+                  👑 Admin Panel
+                </button>
+                <div className="text-xs text-yellow-400 text-center">
+                  Read-only access
+                </div>
+              </>
+            )}
+          </>
         ) : (
           <div className="text-center text-gray-400 text-sm">
             Log in to start chatting
@@ -54,7 +90,12 @@ export function Sidebar() {
       <div className="flex-1 overflow-y-auto">
         {auth.isAuthenticated ? (
           <div className="p-2">
-            {conversations.length === 0 ? (
+            {isAdmin && conversations.length === 0 ? (
+              <div className="text-gray-400 text-sm p-4 text-center">
+                <p className="mb-2">Admin Mode</p>
+                <p className="text-xs">Use Admin Panel to view all conversations</p>
+              </div>
+            ) : conversations.length === 0 ? (
               <div className="text-gray-400 text-sm p-4 text-center">
                 No conversations yet
               </div>

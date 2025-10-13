@@ -34,6 +34,24 @@ app.get("/api/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+// Get current user info (including admin status)
+app.get("/api/user/me", requireAuth, async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.email) {
+      return res.status(401).json({ error: 'User not authenticated or email not provided' });
+    }
+
+    const user = await chatDBService.ensureUser(req.user.email, req.user.name);
+    res.json({
+      email: user.email,
+      name: user.name,
+      is_admin: user.is_admin
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Get all conversations
 app.get("/api/conversations", requireAuth, async (req, res, next) => {
   try {
@@ -51,11 +69,39 @@ app.get("/api/conversations", requireAuth, async (req, res, next) => {
   }
 });
 
+// Admin: Get all conversations from all users
+app.get("/api/admin/conversations", requireAuth, async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.email) {
+      return res.status(401).json({ error: 'User not authenticated or email not provided' });
+    }
+
+    // Check if user is admin
+    const isAdmin = await chatDBService.isUserAdmin(req.user.email);
+    if (!isAdmin) {
+      console.log(`[SECURITY] Non-admin user ${req.user.email} attempted to access admin endpoint`);
+      return res.status(403).json({ error: 'Forbidden: Admin access required' });
+    }
+
+    const conversations = await chatDBService.getAllConversationsForAdmin();
+    res.json(conversations);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Create new conversation
 app.post("/api/conversations", requireAuth, async (req, res, next) => {
   try {
     if (!req.user || !req.user.email) {
       return res.status(401).json({ error: 'User not authenticated or email not provided' });
+    }
+
+    // Check if user is admin - admins cannot create conversations (read-only access)
+    const isAdmin = await chatDBService.isUserAdmin(req.user.email);
+    if (isAdmin) {
+      console.log(`[SECURITY] Admin ${req.user.email} attempted to create a conversation (read-only access only)`);
+      return res.status(403).json({ error: 'Forbidden: Admins have read-only access and cannot create conversations' });
     }
 
     // Ensure user exists in database
@@ -80,7 +126,19 @@ app.get("/api/conversations/:id/messages", requireAuth, async (req, res, next) =
       return res.status(400).json({ error: "Invalid conversation ID" });
     }
     
-    const messages = await chatDBService.getConversationMessages(conversationId, req.user.email);
+    // Check if user is admin
+    const isAdmin = await chatDBService.isUserAdmin(req.user.email);
+    
+    let messages;
+    if (isAdmin) {
+      // Admins can view any conversation (read-only)
+      messages = await chatDBService.getConversationMessagesAdmin(conversationId);
+      console.log(`[ADMIN ACCESS] Admin ${req.user.email} viewed conversation ${conversationId}`);
+    } else {
+      // Regular users can only view their own conversations
+      messages = await chatDBService.getConversationMessages(conversationId, req.user.email);
+    }
+    
     res.json(messages);
   } catch (err) {
     next(err);
@@ -92,6 +150,13 @@ app.delete("/api/conversations/:id", requireAuth, async (req, res, next) => {
   try {
     if (!req.user || !req.user.email) {
       return res.status(401).json({ error: 'User not authenticated or email not provided' });
+    }
+
+    // Check if user is admin - admins cannot delete conversations (read-only access)
+    const isAdmin = await chatDBService.isUserAdmin(req.user.email);
+    if (isAdmin) {
+      console.log(`[SECURITY] Admin ${req.user.email} attempted to delete a conversation (read-only access only)`);
+      return res.status(403).json({ error: 'Forbidden: Admins have read-only access and cannot delete conversations' });
     }
 
     const conversationId = parseInt(req.params.id);
@@ -114,6 +179,13 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
   try {
     if (!req.user || !req.user.email) {
       return res.status(401).json({ error: 'User not authenticated or email not provided' });
+    }
+
+    // Check if user is admin - admins cannot send messages (read-only access)
+    const isAdmin = await chatDBService.isUserAdmin(req.user.email);
+    if (isAdmin) {
+      console.log(`[SECURITY] Admin ${req.user.email} attempted to send a message (read-only access only)`);
+      return res.status(403).json({ error: 'Forbidden: Admins have read-only access and cannot send messages' });
     }
 
     // Ensure user exists in database
