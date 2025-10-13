@@ -2,7 +2,7 @@
 applyTo: '**'
 ---
 - Stay in line with what is asked.
-- Do not go out of your way doing extra files like unless asked for:
+- Do not go out of your way doing extra files like:
     - example files
     - summary files
     - test files

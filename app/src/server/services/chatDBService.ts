@@ -10,38 +10,45 @@ export class ChatDBService {
   }
 
   // Ensure user exists in database, create if not exists
-  async ensureUser(userId: string, email?: string, name?: string): Promise<User> {
+  async ensureUser(email: string, name?: string): Promise<User> {
     try {
+      if (!email) {
+        throw new Error('Email is required to identify user');
+      }
+
       // Try to get existing user
       let user = await db.oneOrNone<User>(
-        'SELECT id, user_id, email, name, created_at, last_login FROM users WHERE user_id = $1',
-        [userId]
+        'SELECT id, email, name, created_at, last_login FROM users WHERE email = $1',
+        [email]
       );
 
       if (user) {
-        // Update last login
+        // Update last login and name if provided
         await db.none(
-          'UPDATE users SET last_login = now(), email = COALESCE($2, email), name = COALESCE($3, name) WHERE user_id = $1',
-          [userId, email, name]
+          'UPDATE users SET last_login = now(), name = COALESCE($2, name) WHERE email = $1',
+          [email, name]
         );
         
         // Return updated user data
         user = await db.one<User>(
-          'SELECT id, user_id, email, name, created_at, last_login FROM users WHERE user_id = $1',
-          [userId]
+          'SELECT id, email, name, created_at, last_login FROM users WHERE email = $1',
+          [email]
         );
+        
+        console.log(`[DB] User ${email} logged in`);
       } else {
         // Create new user
         const userData = CreateUserSchema.parse({
-          user_id: userId,
           email,
           name,
         });
 
         user = await db.one<User>(
-          'INSERT INTO users (user_id, email, name) VALUES ($1, $2, $3) RETURNING id, user_id, email, name, created_at, last_login',
-          [userData.user_id, userData.email || null, userData.name || null]
+          'INSERT INTO users (email, name) VALUES ($1, $2) RETURNING id, email, name, created_at, last_login',
+          [userData.email, userData.name || null]
         );
+        
+        console.log(`[DB] New user created: ${email}`);
       }
 
       return user;
@@ -52,12 +59,16 @@ export class ChatDBService {
   }
 
   // Create a new conversation
-  async createNewConversation(userId: string): Promise<Conversation> {
+  async createNewConversation(userEmail: string): Promise<Conversation> {
     try {
+      if (!userEmail) {
+        throw new Error('User email is required to create conversation');
+      }
+
       // Create new conversation with a default title (will be updated later)
       const newConversation = await db.one<Conversation>(
-        'INSERT INTO conversations (user_id, title) VALUES ($1, $2) RETURNING id, user_id, title, created_at',
-        [userId, 'New Chat']
+        'INSERT INTO conversations (user_email, title) VALUES ($1, $2) RETURNING id, user_email, title, created_at',
+        [userEmail, 'New Chat']
       );
 
       return newConversation;
@@ -68,11 +79,15 @@ export class ChatDBService {
   }
 
   // Get a specific conversation by ID for a specific user
-  async getConversationById(conversationId: number, userId: string): Promise<Conversation | null> {
+  async getConversationById(conversationId: number, userEmail: string): Promise<Conversation | null> {
     try {
+      if (!userEmail) {
+        throw new Error('User email is required');
+      }
+
       const conversation = await db.oneOrNone<Conversation>(
-        'SELECT id, user_id, title, created_at FROM conversations WHERE id = $1 AND user_id = $2',
-        [conversationId, userId]
+        'SELECT id, user_email, title, created_at FROM conversations WHERE id = $1 AND user_email = $2',
+        [conversationId, userEmail]
       );
       return conversation;
     } catch (error) {
@@ -82,12 +97,18 @@ export class ChatDBService {
   }
 
   // Get all conversations for a specific user ordered by most recent
-  async getAllConversations(userId: string): Promise<Conversation[]> {
+  async getAllConversations(userEmail: string): Promise<Conversation[]> {
     try {
+      if (!userEmail) {
+        throw new Error('User email is required');
+      }
+
       const conversations = await db.any<Conversation>(
-        'SELECT id, user_id, title, created_at FROM conversations WHERE user_id = $1 ORDER BY created_at DESC',
-        [userId]
+        'SELECT id, user_email, title, created_at FROM conversations WHERE user_email = $1 ORDER BY created_at DESC',
+        [userEmail]
       );
+      
+      console.log(`[DB] User ${userEmail} retrieved ${conversations.length} conversations`);
       return conversations;
     } catch (error) {
       console.error('Error getting all conversations:', error);
@@ -175,15 +196,20 @@ export class ChatDBService {
   }
 
   // Get all messages for a conversation (with user ownership verification)
-  async getConversationMessages(conversationId: number, userId: string): Promise<Message[]> {
+  async getConversationMessages(conversationId: number, userEmail: string): Promise<Message[]> {
     try {
+      if (!userEmail) {
+        throw new Error('User email is required');
+      }
+
       // Verify that the conversation belongs to the user before returning messages
       const conversationExists = await db.oneOrNone(
-        'SELECT 1 FROM conversations WHERE id = $1 AND user_id = $2',
-        [conversationId, userId]
+        'SELECT 1 FROM conversations WHERE id = $1 AND user_email = $2',
+        [conversationId, userEmail]
       );
 
       if (!conversationExists) {
+        console.log(`[DB SECURITY] Access denied: User ${userEmail} attempted to access conversation ${conversationId}`);
         throw new Error('Conversation not found or access denied');
       }
 
@@ -191,6 +217,8 @@ export class ChatDBService {
         'SELECT id, conversation_id, message_type_id, message_content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
         [conversationId]
       );
+      
+      console.log(`[DB] User ${userEmail} retrieved ${messages.length} messages from conversation ${conversationId}`);
       return messages;
     } catch (error) {
       console.error('Error getting conversation messages:', error);
@@ -199,16 +227,27 @@ export class ChatDBService {
   }
 
   // Delete a conversation and all its messages (with user ownership verification)
-  async deleteConversation(conversationId: number, userId: string): Promise<boolean> {
+  async deleteConversation(conversationId: number, userEmail: string): Promise<boolean> {
     try {
+      if (!userEmail) {
+        throw new Error('User email is required');
+      }
+
       // The CASCADE delete in our schema will automatically delete all messages
       // when a conversation is deleted. Only allow deletion if user owns the conversation
       const result = await db.result(
-        'DELETE FROM conversations WHERE id = $1 AND user_id = $2',
-        [conversationId, userId]
+        'DELETE FROM conversations WHERE id = $1 AND user_email = $2',
+        [conversationId, userEmail]
       );
       
-      return result.rowCount > 0;
+      const deleted = result.rowCount > 0;
+      if (deleted) {
+        console.log(`[DB] User ${userEmail} deleted conversation ${conversationId}`);
+      } else {
+        console.log(`[DB SECURITY] Access denied: User ${userEmail} attempted to delete conversation ${conversationId}`);
+      }
+      
+      return deleted;
     } catch (error) {
       console.error('Error deleting conversation:', error);
       throw new Error('Failed to delete conversation');

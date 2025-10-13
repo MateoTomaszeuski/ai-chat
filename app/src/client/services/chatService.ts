@@ -1,4 +1,5 @@
 import type { ChatMessage, Conversation } from "../types/chat";
+import { getAuthHeadersFromStorage } from "../lib/auth";
 
 export interface ChatServiceOptions {
   messages: ChatMessage[];
@@ -19,9 +20,15 @@ export interface ChatServiceError {
 export class ChatService {
   async getConversations(): Promise<Conversation[]> {
     try {
-      const response = await fetch("/api/conversations");
+      const headers = getAuthHeadersFromStorage();
+      const response = await fetch("/api/conversations", {
+        headers
+      });
       if (response.ok) {
         return await response.json();
+      }
+      if (response.status === 401) {
+        console.error("Unauthorized: Please log in to access conversations");
       }
       return [];
     } catch (error) {
@@ -32,12 +39,16 @@ export class ChatService {
 
   async createNewConversation(): Promise<Conversation | null> {
     try {
+      const headers = getAuthHeadersFromStorage();
       const response = await fetch("/api/conversations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers
       });
       if (response.ok) {
         return await response.json();
+      }
+      if (response.status === 401) {
+        console.error("Unauthorized: Please log in to create a conversation");
       }
       return null;
     } catch (error) {
@@ -48,7 +59,10 @@ export class ChatService {
 
   async getConversationMessages(conversationId: number): Promise<ChatMessage[]> {
     try {
-      const response = await fetch(`/api/conversations/${conversationId}/messages`);
+      const headers = getAuthHeadersFromStorage();
+      const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+        headers
+      });
       if (response.ok) {
         const dbMessages = await response.json();
         return dbMessages.map((msg: { id: number; message_content: string; message_type_id: number; created_at: string }) => ({
@@ -57,6 +71,9 @@ export class ChatService {
           sender: msg.message_type_id === 1 ? 'user' as const : 'ai' as const,
           timestamp: new Date(msg.created_at),
         }));
+      }
+      if (response.status === 401) {
+        console.error("Unauthorized: Please log in to access messages");
       }
       return [];
     } catch (error) {
@@ -67,9 +84,14 @@ export class ChatService {
 
   async deleteConversation(conversationId: number): Promise<boolean> {
     try {
+      const headers = getAuthHeadersFromStorage();
       const response = await fetch(`/api/conversations/${conversationId}`, {
         method: "DELETE",
+        headers
       });
+      if (response.status === 401) {
+        console.error("Unauthorized: Please log in to delete conversations");
+      }
       return response.ok;
     } catch (error) {
       console.error("Error deleting conversation:", error);
@@ -98,11 +120,10 @@ export class ChatService {
         content: msg.content
       }));
 
+      const headers = getAuthHeadersFromStorage();
       const response = await fetch("/api/chat", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers,
         body: JSON.stringify({ 
           messages: messagesToSend,
           conversationId 
@@ -125,6 +146,17 @@ export class ChatService {
           conversationId: data.conversationId || conversationId || 0,
           titleGenerated: data.titleGenerated || false
         };
+      } else if (response.status === 401) {
+        const errorText = "Error: Unauthorized. Please log in to chat.";
+        
+        const errorMessage: ChatMessage = {
+          id: Date.now().toString() + "_error",
+          content: errorText,
+          sender: 'ai',
+          timestamp: new Date(),
+        };
+        
+        return { errorMessage };
       } else {
         const errorText = "Error: Failed to get response from server";
         

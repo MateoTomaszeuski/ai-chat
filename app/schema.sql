@@ -14,17 +14,19 @@ ON CONFLICT (id) DO NOTHING;
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
-  user_id TEXT UNIQUE NOT NULL, -- OIDC sub claim
-  email TEXT,
+  email TEXT UNIQUE NOT NULL,
   name TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Create index on email for performance
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+
 -- Conversations table
 CREATE TABLE IF NOT EXISTS conversations (
   id SERIAL PRIMARY KEY,
-  user_id TEXT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  user_email TEXT NOT NULL REFERENCES users(email) ON DELETE CASCADE,
   title TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -117,8 +117,8 @@ class AuthService {
       // Attach user information to request
       req.user = payload as AuthenticatedUser;
 
-      // Log user email for debugging (as requested)
-      console.log(`Authenticated request from user: ${req.user.email || req.user.sub} - ${req.method} ${req.path}`);
+      // Log user email for debugging and security tracking
+      console.log(`[AUTH] User authenticated: ${req.user.email || 'no-email'} (sub: ${req.user.sub}) - ${req.method} ${req.path}`);
       
       next();
     } catch (error) {
