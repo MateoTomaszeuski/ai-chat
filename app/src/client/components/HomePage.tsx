@@ -14,7 +14,6 @@ export function HomePage() {
   // Navigate to chat when a conversation is created (but only if we're actually sending a message)
   useEffect(() => {
     if (currentConversationId && isSendingMessage) {
-      console.log('Navigating from home to chat:', currentConversationId);
       navigate(`/chat/${currentConversationId}`);
       setIsSendingMessage(false);
     }

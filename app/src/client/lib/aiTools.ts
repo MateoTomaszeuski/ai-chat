@@ -34,13 +34,13 @@ export const changeBackgroundColorTool: AITool = {
   type: 'function',
   function: {
     name: 'change_background_color',
-    description: 'Change the background color of the chat interface using Tailwind CSS color classes.',
+    description: 'Change the background color of the chat interface using Tailwind CSS color classes. Available colors: slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose. Shades: 50, 100, 200, 300, 400, 500, 600, 700, 800, 900. Also: white, black.',
     parameters: {
       type: 'object',
       properties: {
         color: {
           type: 'string',
-          description: 'A Tailwind CSS background color class (e.g., "bg-blue-500", "bg-slate-100", "bg-red-200"). Use the full class name with "bg-" prefix.',
+          description: 'A Tailwind CSS background color class (e.g., "bg-blue-500", "bg-slate-100", "bg-rose-200"). Use the full class name with "bg-" prefix.',
         },
       },
       required: ['color'],

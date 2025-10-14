@@ -26,10 +26,6 @@ export const LoginButton = () => {
   }
 
   if (auth.isAuthenticated && auth.user) {
-    // Log user email to console as requested
-    console.log('User email:', auth.user.profile.email);
-    console.log('User profile:', auth.user.profile); // Log full profile for debugging
-    
     return (
       <div className="flex flex-col gap-2">
         <div className="text-xs text-gray-400">

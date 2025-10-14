@@ -11,7 +11,7 @@ import {
   useSendMessage,
   useChatBackground
 } from "../hooks";
-import { parseToolCalls, executeToolCall } from "../lib/aiTools";
+import { executeToolCall } from "../lib/aiTools";
 
 interface ChatProviderProps {
   children: ReactNode;
@@ -101,36 +101,24 @@ export function ChatProvider({ children }: ChatProviderProps) {
       });
 
       // The new API structure returns the response directly
-      const { aiMessage, conversationId: resultConversationId } = result.result;
+      const { aiMessage, conversationId: resultConversationId, toolCalls } = result.result;
       
-      // Parse the AI response for tool calls
-      const toolCalls = parseToolCalls(aiMessage.content);
-      
-      // Execute any tool calls found in the response
-      if (toolCalls.length > 0) {
-        console.log('Found tool calls in AI response:', toolCalls);
-        
-        for (const { toolName, args } of toolCalls) {
-          const toolResult = executeToolCall(toolName, args, {
+      // Execute any tool calls returned from the API
+      if (toolCalls && toolCalls.length > 0) {
+        for (const toolCall of toolCalls) {
+          executeToolCall(toolCall.name, toolCall.arguments, {
             setBackgroundColor,
           });
-          
-          console.log(`Tool ${toolName} execution:`, toolResult);
         }
-        
-        // Remove tool call markers from the displayed response
-        const cleanedResponse = aiMessage.content.replace(/\[TOOL:\w+\]\{[^}]+\}/g, '').trim();
-        setAiResponse(cleanedResponse || aiMessage.content);
-      } else {
-        setAiResponse(aiMessage.content);
       }
+      
+      setAiResponse(aiMessage.content);
       
       // Clear pending message since it's now handled by the query cache
       setPendingUserMessage(null);
       
       // Update current conversation ID if it was created or if we're forcing a new conversation
       if (resultConversationId) {
-        console.log('Setting conversation ID to:', resultConversationId, 'forceNew:', forceNewConversation);
         setCurrentConversationId(resultConversationId);
       }
     } catch (error) {

@@ -17,6 +17,11 @@ export interface ChatServiceResponse {
   aiMessage: ChatMessage;
   conversationId: number;
   titleGenerated?: boolean;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+  }>;
 }
 
 export interface ChatServiceError {
@@ -131,6 +136,11 @@ interface ChatApiResponse {
   error?: string;
   conversationId?: number;
   titleGenerated?: boolean;
+  toolCalls?: Array<{
+    id: string;
+    name: string;
+    arguments: Record<string, unknown>;
+  }>;
 }
 
 // Chat API functions
@@ -184,7 +194,8 @@ export const chatApi = {
     return { 
       aiMessage,
       conversationId: data.conversationId || conversationId || 0,
-      titleGenerated: data.titleGenerated || false
+      titleGenerated: data.titleGenerated || false,
+      toolCalls: data.toolCalls
     };
   },
 };

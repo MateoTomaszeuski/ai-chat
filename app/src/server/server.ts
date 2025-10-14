@@ -79,7 +79,6 @@ app.get("/api/admin/conversations", requireAuth, async (req, res, next) => {
     // Check if user is admin
     const isAdmin = await chatDBService.isUserAdmin(req.user.email);
     if (!isAdmin) {
-      console.log(`[SECURITY] Non-admin user ${req.user.email} attempted to access admin endpoint`);
       return res.status(403).json({ error: 'Forbidden: Admin access required' });
     }
 
@@ -100,7 +99,6 @@ app.post("/api/conversations", requireAuth, async (req, res, next) => {
     // Check if user is admin - admins cannot create conversations (read-only access)
     const isAdmin = await chatDBService.isUserAdmin(req.user.email);
     if (isAdmin) {
-      console.log(`[SECURITY] Admin ${req.user.email} attempted to create a conversation (read-only access only)`);
       return res.status(403).json({ error: 'Forbidden: Admins have read-only access and cannot create conversations' });
     }
 
@@ -133,7 +131,6 @@ app.get("/api/conversations/:id/messages", requireAuth, async (req, res, next) =
     if (isAdmin) {
       // Admins can view any conversation (read-only)
       messages = await chatDBService.getConversationMessagesAdmin(conversationId);
-      console.log(`[ADMIN ACCESS] Admin ${req.user.email} viewed conversation ${conversationId}`);
     } else {
       // Regular users can only view their own conversations
       messages = await chatDBService.getConversationMessages(conversationId, req.user.email);
@@ -155,7 +152,6 @@ app.delete("/api/conversations/:id", requireAuth, async (req, res, next) => {
     // Check if user is admin - admins cannot delete conversations (read-only access)
     const isAdmin = await chatDBService.isUserAdmin(req.user.email);
     if (isAdmin) {
-      console.log(`[SECURITY] Admin ${req.user.email} attempted to delete a conversation (read-only access only)`);
       return res.status(403).json({ error: 'Forbidden: Admins have read-only access and cannot delete conversations' });
     }
 
@@ -184,7 +180,6 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
     // Check if user is admin - admins cannot send messages (read-only access)
     const isAdmin = await chatDBService.isUserAdmin(req.user.email);
     if (isAdmin) {
-      console.log(`[SECURITY] Admin ${req.user.email} attempted to send a message (read-only access only)`);
       return res.status(403).json({ error: 'Forbidden: Admins have read-only access and cannot send messages' });
     }
 
@@ -195,21 +190,6 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
     const messages = parsed.messages;
     const conversationId = req.body.conversationId;
     const tools = req.body.tools;
-    
-    // Log available AI tools sent from frontend
-    if (tools && Array.isArray(tools)) {
-      console.log(`\n=== AI Tools Available (${tools.length} tools) ===`);
-      tools.forEach((tool: { function?: { name?: string; description?: string; parameters?: unknown } }, index: number) => {
-        if (tool.function) {
-          console.log(`${index + 1}. ${tool.function.name}`);
-          console.log(`   Description: ${tool.function.description}`);
-          console.log(`   Parameters:`, JSON.stringify(tool.function.parameters, null, 2));
-        }
-      });
-      console.log('=== End Tools List ===\n');
-    } else {
-      console.log('No AI tools provided in request');
-    }
     
     let conversation;
     
@@ -246,8 +226,63 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
       }
     }
     
-    // Get AI response
-    const result = await aiService.getChatCompletion(messages);
+    // Get AI response - with tool execution loop
+    const result = await aiService.getChatCompletion(messages, tools);
+    
+    // Store the original tool calls to send to frontend
+    const executedToolCalls = result.toolCalls;
+    
+    // If the AI wants to use tools, execute them and get a final response
+    if (result.toolCalls && result.toolCalls.length > 0) {
+      // Build messages including the assistant's tool call and tool results
+      const messagesWithToolCalls: Array<{
+        role: 'system' | 'user' | 'assistant' | 'tool';
+        content: string | null;
+        tool_calls?: Array<{
+          id: string;
+          type: 'function';
+          function: {
+            name: string;
+            arguments: string;
+          };
+        }>;
+        tool_call_id?: string;
+      }> = [...messages];
+      
+      // Add assistant message with tool calls
+      messagesWithToolCalls.push({
+        role: 'assistant',
+        content: result.response || null,
+        tool_calls: result.toolCalls.map(tc => ({
+          id: tc.id,
+          type: 'function' as const,
+          function: {
+            name: tc.name,
+            arguments: JSON.stringify(tc.arguments),
+          },
+        })),
+      });
+      
+      // Add tool results as messages
+      for (const toolCall of result.toolCalls) {
+        messagesWithToolCalls.push({
+          role: 'tool',
+          content: JSON.stringify({
+            success: true,
+            message: `Successfully executed ${toolCall.name}`,
+          }),
+          tool_call_id: toolCall.id,
+        });
+      }
+      
+      // Get the final response from the AI after tool execution
+      const finalResult = await aiService.getChatCompletion(messagesWithToolCalls, tools);
+      
+      // Use the final result's text response, but keep the original tool calls
+      result.response = finalResult.response;
+      result.error = finalResult.error;
+      // Keep executedToolCalls to send to frontend for execution
+    }
     
     // Save AI response to database if successful
     if (result.response && !result.error) {
@@ -259,7 +294,9 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
     }
     
     res.json({
-      ...result,
+      response: result.response,
+      error: result.error,
+      toolCalls: executedToolCalls, // Send the original tool calls to frontend
       conversationId: conversation.id,
       titleGenerated
     });
