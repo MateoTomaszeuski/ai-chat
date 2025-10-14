@@ -88,13 +88,16 @@ export class ChatService {
           timestamp: new Date(msg.created_at),
         }));
       }
-      if (response.status === 401) {
-        console.error("Unauthorized: Please log in to access messages");
+      if (response.status === 401 || response.status === 403) {
+        throw new Error("Unauthorized: Access denied to this conversation");
       }
-      return [];
+      if (response.status === 404) {
+        throw new Error("Conversation not found");
+      }
+      throw new Error(`Failed to fetch messages: ${response.status}`);
     } catch (error) {
       console.error("Error fetching conversation messages:", error);
-      return [];
+      throw error; // Re-throw the error instead of returning empty array
     }
   }
 

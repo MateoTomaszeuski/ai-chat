@@ -7,6 +7,7 @@ applyTo: '**'
     - summary files
     - test files
     - read me files
+- do not create docs, unless asked for
 - Do not add extra comments, only when the code is really complex and might be necessary.
 - Use tailwind v4 for styling.
     - Ignore the @apply linting errors, we want to use it.
