@@ -1,0 +1,36 @@
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+COPY app/package.json app/pnpm-lock.yaml ./
+
+RUN pnpm install --frozen-lockfile
+
+COPY app/tsconfig.server.json ./
+COPY app/src/server ./src/server
+COPY app/src/lib ./src/lib
+COPY app/schema.sql ./
+
+RUN pnpm run build:server
+
+FROM node:20-alpine
+
+WORKDIR /app
+
+RUN npm install -g pnpm
+
+COPY app/package.json app/pnpm-lock.yaml ./
+
+RUN pnpm install --frozen-lockfile --prod
+
+COPY --from=builder /app/dist-server ./dist-server
+COPY app/schema.sql ./
+
+ENV NODE_ENV=production
+ENV PORT=4000
+
+EXPOSE 4000
+
+CMD ["node", "dist-server/server/server.js"]
