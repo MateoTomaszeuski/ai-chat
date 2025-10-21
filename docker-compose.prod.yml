@@ -1,23 +1,20 @@
 services:
   frontend:
-    image: aichat-frontend:test
+    image: aichat-frontend:latest
     ports:
       - "80:80"
     depends_on:
       - backend
 
   backend:
-    image: aichat-backend:test
+    image: aichat-backend:latest
     ports:
       - "4000:4000"
+    env_file:
+      - ./app/.env
     environment:
       - PORT=4000
       - DATABASE_URL=${DATABASE_URL:-postgres://appuser:apppassword@db:5432/appdb}
-      - OIDC_ISSUER=${OIDC_ISSUER}
-      - OIDC_AUDIENCE=${OIDC_AUDIENCE}
-      - OIDC_JWKS_URI=${OIDC_JWKS_URI}
-      - LLM_API_BASE=${LLM_API_BASE}
-      - API_KEY=${API_KEY}
     depends_on:
       - db
 

@@ -25,45 +25,30 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Extract metadata for frontend
-        id: meta-frontend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/aichat-frontend
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build frontend image
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -f ./Dockerfile.client \
+            -t ${{ secrets.DOCKER_USERNAME }}/aichat-frontend:${{ github.run_number }} \
+            -t ${{ secrets.DOCKER_USERNAME }}/aichat-frontend:latest \
+            .
 
-      - name: Extract metadata for backend
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ secrets.DOCKER_USERNAME }}/aichat-backend
-          tags: |
-            type=ref,event=branch
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
+      - name: Build backend image
+        run: |
+          docker buildx build --platform linux/amd64 \
+            -f ./Dockerfile.server \
+            -t ${{ secrets.DOCKER_USERNAME }}/aichat-backend:${{ github.run_number }} \
+            -t ${{ secrets.DOCKER_USERNAME }}/aichat-backend:latest \
+            .
 
-      - name: Build and push frontend image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.client
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-frontend.outputs.tags }}
-          labels: ${{ steps.meta-frontend.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/aichat-frontend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/aichat-frontend:buildcache,mode=max
+      - name: Push frontend image to DockerHub
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/aichat-frontend:${{ github.run_number }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/aichat-frontend:latest
 
-      - name: Build and push backend image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile.server
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta-backend.outputs.tags }}
-          labels: ${{ steps.meta-backend.outputs.labels }}
-          cache-from: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/aichat-backend:buildcache
-          cache-to: type=registry,ref=${{ secrets.DOCKER_USERNAME }}/aichat-backend:buildcache,mode=max
+      - name: Push backend image to DockerHub
+        if: github.event_name != 'pull_request'
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/aichat-backend:${{ github.run_number }}
+          docker push ${{ secrets.DOCKER_USERNAME }}/aichat-backend:latest
