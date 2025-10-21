@@ -1,5 +1,15 @@
 import { db } from "../server.js";
-import { CreateMessageSchema, CreateUserSchema, type Conversation, type Message, type User } from "../../lib/chatModels.js";
+import { 
+  CreateMessageSchema, 
+  CreateUserSchema, 
+  CreateConversationSummarySchema,
+  MESSAGE_TYPES,
+  type Conversation, 
+  type Message, 
+  type User,
+  type MessageEdit,
+  type ConversationSummary
+} from "../../lib/chatModels.js";
 import { AIService } from "./aiService.js";
 
 export class ChatDBService {
@@ -196,8 +206,8 @@ export class ChatDBService {
     }
   }
 
-  // Get all messages for a conversation (with user ownership verification)
-  async getConversationMessages(conversationId: number, userEmail: string): Promise<Message[]> {
+  // Get all active messages for a conversation (with user ownership verification)
+  async getConversationMessages(conversationId: number, userEmail: string): Promise<Array<Message & { is_edited?: boolean }>> {
     try {
       if (!userEmail) {
         throw new Error('User email is required');
@@ -214,16 +224,192 @@ export class ChatDBService {
         throw new Error('Conversation not found or access denied');
       }
 
-      const messages = await db.any<Message>(
-        'SELECT id, conversation_id, message_type_id, message_content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
+      const messages = await db.any<Message & { is_edited?: boolean }>(
+        `SELECT 
+          m.id, 
+          m.conversation_id, 
+          m.message_type_id, 
+          m.message_content, 
+          m.is_active, 
+          m.created_at,
+          CASE WHEN EXISTS (SELECT 1 FROM message_edits WHERE message_id = m.id) THEN true ELSE false END as is_edited
+         FROM messages m 
+         WHERE m.conversation_id = $1 AND m.is_active = true 
+         ORDER BY m.created_at ASC`,
         [conversationId]
       );
       
-      console.log(`[DB] User ${userEmail} retrieved ${messages.length} messages from conversation ${conversationId}`);
+      console.log(`[DB] User ${userEmail} retrieved ${messages.length} active messages from conversation ${conversationId}`);
       return messages;
     } catch (error) {
       console.error('Error getting conversation messages:', error);
       throw new Error('Failed to get conversation messages');
+    }
+  }
+
+  // Get messages for AI context (active messages after last summary)
+  async getMessagesForAIContext(conversationId: number): Promise<Message[]> {
+    try {
+      // Get the most recent summary
+      const latestSummary = await db.oneOrNone<ConversationSummary>(
+        'SELECT id, conversation_id, summary_content, messages_summarized_up_to_id, created_at FROM conversation_summaries WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [conversationId]
+      );
+
+      if (latestSummary) {
+        // Get messages after the last summary
+        const messages = await db.any<Message>(
+          'SELECT id, conversation_id, message_type_id, message_content, is_active, created_at FROM messages WHERE conversation_id = $1 AND is_active = true AND id > $2 ORDER BY created_at ASC',
+          [conversationId, latestSummary.messages_summarized_up_to_id]
+        );
+        
+        console.log(`[DB] Retrieved ${messages.length} messages after summary for AI context`);
+        return messages;
+      } else {
+        // No summary exists, return all active messages
+        const messages = await db.any<Message>(
+          'SELECT id, conversation_id, message_type_id, message_content, is_active, created_at FROM messages WHERE conversation_id = $1 AND is_active = true ORDER BY created_at ASC',
+          [conversationId]
+        );
+        
+        console.log(`[DB] Retrieved all ${messages.length} active messages for AI context`);
+        return messages;
+      }
+    } catch (error) {
+      console.error('Error getting messages for AI context:', error);
+      throw new Error('Failed to get messages for AI context');
+    }
+  }
+
+  // Edit a message (creates a new edit history entry and updates the message)
+  async editMessage(messageId: number, newContent: string, userEmail: string): Promise<Message> {
+    try {
+      if (!userEmail) {
+        throw new Error('User email is required');
+      }
+
+      // Get the message and verify ownership
+      const message = await db.oneOrNone<Message>(
+        `SELECT m.id, m.conversation_id, m.message_type_id, m.message_content, m.is_active, m.created_at 
+         FROM messages m 
+         JOIN conversations c ON m.conversation_id = c.id 
+         WHERE m.id = $1 AND c.user_email = $2`,
+        [messageId, userEmail]
+      );
+
+      if (!message) {
+        console.log(`[DB SECURITY] Access denied: User ${userEmail} attempted to edit message ${messageId}`);
+        throw new Error('Message not found or access denied');
+      }
+
+      // Only allow editing user messages
+      if (message.message_type_id !== MESSAGE_TYPES.USER) {
+        throw new Error('Only user messages can be edited');
+      }
+
+      // Store the old content in edit history
+      await db.none(
+        'INSERT INTO message_edits (message_id, previous_content) VALUES ($1, $2)',
+        [messageId, message.message_content]
+      );
+
+      // Update the message content
+      const updatedMessage = await db.one<Message>(
+        'UPDATE messages SET message_content = $1 WHERE id = $2 RETURNING id, conversation_id, message_type_id, message_content, is_active, created_at',
+        [newContent, messageId]
+      );
+
+      console.log(`[DB] User ${userEmail} edited message ${messageId}`);
+      return updatedMessage;
+    } catch (error) {
+      console.error('Error editing message:', error);
+      throw new Error('Failed to edit message');
+    }
+  }
+
+  // Get edit history for a message
+  async getMessageEditHistory(messageId: number, userEmail: string): Promise<MessageEdit[]> {
+    try {
+      if (!userEmail) {
+        throw new Error('User email is required');
+      }
+
+      // Verify ownership
+      const messageExists = await db.oneOrNone(
+        `SELECT 1 FROM messages m 
+         JOIN conversations c ON m.conversation_id = c.id 
+         WHERE m.id = $1 AND c.user_email = $2`,
+        [messageId, userEmail]
+      );
+
+      if (!messageExists) {
+        console.log(`[DB SECURITY] Access denied: User ${userEmail} attempted to view edit history for message ${messageId}`);
+        throw new Error('Message not found or access denied');
+      }
+
+      const edits = await db.any<MessageEdit>(
+        'SELECT id, message_id, previous_content, edited_at FROM message_edits WHERE message_id = $1 ORDER BY edited_at DESC',
+        [messageId]
+      );
+
+      return edits;
+    } catch (error) {
+      console.error('Error getting message edit history:', error);
+      throw new Error('Failed to get message edit history');
+    }
+  }
+
+  // Check if a message has been edited
+  async hasMessageBeenEdited(messageId: number): Promise<boolean> {
+    try {
+      const editCount = await db.one<{ count: string }>(
+        'SELECT COUNT(*) as count FROM message_edits WHERE message_id = $1',
+        [messageId]
+      );
+      return parseInt(editCount.count) > 0;
+    } catch (error) {
+      console.error('Error checking if message has been edited:', error);
+      return false;
+    }
+  }
+
+  // Save a conversation summary
+  async saveConversationSummary(
+    conversationId: number, 
+    summaryContent: string, 
+    messagesSummarizedUpToId: number
+  ): Promise<ConversationSummary> {
+    try {
+      const summaryData = CreateConversationSummarySchema.parse({
+        conversation_id: conversationId,
+        summary_content: summaryContent,
+        messages_summarized_up_to_id: messagesSummarizedUpToId,
+      });
+
+      const summary = await db.one<ConversationSummary>(
+        'INSERT INTO conversation_summaries (conversation_id, summary_content, messages_summarized_up_to_id) VALUES ($1, $2, $3) RETURNING id, conversation_id, summary_content, messages_summarized_up_to_id, created_at',
+        [summaryData.conversation_id, summaryData.summary_content, summaryData.messages_summarized_up_to_id]
+      );
+
+      console.log(`[DB] Saved conversation summary for conversation ${conversationId}`);
+      return summary;
+    } catch (error) {
+      console.error('Error saving conversation summary:', error);
+      throw new Error('Failed to save conversation summary');
+    }
+  }
+
+  // Get the latest summary for a conversation
+  async getLatestSummary(conversationId: number): Promise<ConversationSummary | null> {
+    try {
+      const summary = await db.oneOrNone<ConversationSummary>(
+        'SELECT id, conversation_id, summary_content, messages_summarized_up_to_id, created_at FROM conversation_summaries WHERE conversation_id = $1 ORDER BY created_at DESC LIMIT 1',
+        [conversationId]
+      );
+      return summary;
+    } catch (error) {
+      console.error('Error getting latest summary:', error);
+      return null;
     }
   }
 
@@ -312,14 +498,24 @@ export class ChatDBService {
   }
 
   // Admin: Get messages for any conversation (without ownership check) - READ ONLY
-  async getConversationMessagesAdmin(conversationId: number): Promise<Message[]> {
+  async getConversationMessagesAdmin(conversationId: number): Promise<Array<Message & { is_edited?: boolean }>> {
     try {
-      const messages = await db.any<Message>(
-        'SELECT id, conversation_id, message_type_id, message_content, created_at FROM messages WHERE conversation_id = $1 ORDER BY created_at ASC',
+      const messages = await db.any<Message & { is_edited?: boolean }>(
+        `SELECT 
+          m.id, 
+          m.conversation_id, 
+          m.message_type_id, 
+          m.message_content, 
+          m.is_active, 
+          m.created_at,
+          CASE WHEN EXISTS (SELECT 1 FROM message_edits WHERE message_id = m.id) THEN true ELSE false END as is_edited
+         FROM messages m 
+         WHERE m.conversation_id = $1 AND m.is_active = true 
+         ORDER BY m.created_at ASC`,
         [conversationId]
       );
       
-      console.log(`[DB ADMIN] Retrieved ${messages.length} messages from conversation ${conversationId} for admin view`);
+      console.log(`[DB ADMIN] Retrieved ${messages.length} active messages from conversation ${conversationId} for admin view`);
       return messages;
     } catch (error) {
       console.error('Error getting conversation messages for admin:', error);

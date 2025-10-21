@@ -1,4 +1,4 @@
-import type { ChatMessage, Conversation, UserInfo } from "../types/chat";
+import type { ChatMessage, Conversation, UserInfo, MessageEdit } from "../types/chat";
 import { getAuthHeadersFromStorage } from "../lib/auth";
 
 export interface ChatServiceOptions {
@@ -81,12 +81,19 @@ export class ChatService {
       });
       if (response.ok) {
         const dbMessages = await response.json();
-        return dbMessages.map((msg: { id: number; message_content: string; message_type_id: number; created_at: string }) => ({
-          id: msg.id.toString(),
-          content: msg.message_content,
-          sender: msg.message_type_id === 1 ? 'user' as const : 'ai' as const,
-          timestamp: new Date(msg.created_at),
-        }));
+        
+        const messages = dbMessages.map((msg: { id: number; message_content: string; message_type_id: number; created_at: string; is_edited?: boolean }) => {
+          return {
+            id: msg.id.toString(),
+            content: msg.message_content,
+            sender: msg.message_type_id === 1 ? 'user' as const : 'ai' as const,
+            timestamp: new Date(msg.created_at),
+            dbId: msg.id,
+            isEdited: msg.is_edited || false,
+          };
+        });
+        
+        return messages;
       }
       if (response.status === 401 || response.status === 403) {
         throw new Error("Unauthorized: Access denied to this conversation");
@@ -97,7 +104,38 @@ export class ChatService {
       throw new Error(`Failed to fetch messages: ${response.status}`);
     } catch (error) {
       console.error("Error fetching conversation messages:", error);
-      throw error; // Re-throw the error instead of returning empty array
+      throw error;
+    }
+  }
+
+  async editMessage(messageId: number, newContent: string): Promise<boolean> {
+    try {
+      const headers = getAuthHeadersFromStorage();
+      const response = await fetch(`/api/messages/${messageId}`, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ new_content: newContent }),
+      });
+      return response.ok;
+    } catch (error) {
+      console.error("Error editing message:", error);
+      return false;
+    }
+  }
+
+  async getMessageEditHistory(messageId: number): Promise<MessageEdit[]> {
+    try {
+      const headers = getAuthHeadersFromStorage();
+      const response = await fetch(`/api/messages/${messageId}/history`, {
+        headers
+      });
+      if (response.ok) {
+        return await response.json();
+      }
+      return [];
+    } catch (error) {
+      console.error("Error fetching message edit history:", error);
+      return [];
     }
   }
 

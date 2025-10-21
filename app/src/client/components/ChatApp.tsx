@@ -3,7 +3,7 @@ import { MessageInput } from "./MessageInput";
 import { useChatContext } from "../context";
 
 export function ChatApp() {
-  const { messages, loading, getAIResponse } = useChatContext();
+  const { messages, loading, getAIResponse, editMessage } = useChatContext();
 
   const handleSendMessage = async (userPrompt: string) => {
     await getAIResponse(userPrompt);
@@ -12,7 +12,7 @@ export function ChatApp() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 min-h-0">
-        <ChatContainer messages={messages} loading={loading} />
+        <ChatContainer messages={messages} loading={loading} onEditMessage={editMessage} />
       </div>
       <div className="border-t bg-white">
         <MessageInput onSendMessage={handleSendMessage} loading={loading} />

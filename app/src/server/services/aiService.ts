@@ -65,6 +65,7 @@ export class AIService {
   private readonly apiBaseUrl: string;
   private readonly apiKey: string;
   private readonly model: string;
+  private readonly summaryTriggerTokens: number = 100000;
 
   constructor() {
     this.apiBaseUrl = process.env.LLM_API_BASE || "https://ai-snow.reindeer-pinecone.ts.net/api/chat/completions";
@@ -74,6 +75,52 @@ export class AIService {
       throw new Error("API_KEY environment variable is required");
     }
     this.apiKey = process.env.API_KEY;
+  }
+
+  // Approximate token count (rough estimation: ~4 chars per token)
+  estimateTokenCount(text: string): number {
+    return Math.ceil(text.length / 4);
+  }
+
+  // Count tokens in a message array
+  countMessageTokens(messages: z.infer<typeof OpenAIChatMessage>[]): number {
+    let totalTokens = 0;
+    for (const msg of messages) {
+      if (msg.content) {
+        totalTokens += this.estimateTokenCount(msg.content);
+      }
+      if (msg.tool_calls) {
+        totalTokens += this.estimateTokenCount(JSON.stringify(msg.tool_calls));
+      }
+    }
+    return totalTokens;
+  }
+
+  // Check if context needs summarization
+  needsSummarization(tokenCount: number): boolean {
+    return tokenCount >= this.summaryTriggerTokens;
+  }
+
+  // Generate a summary of messages
+  async generateSummary(messages: z.infer<typeof OpenAIChatMessage>[]): Promise<string> {
+    try {
+      const summaryPrompt: z.infer<typeof OpenAIChatMessage>[] = [
+        {
+          role: 'system',
+          content: 'You are a conversation summarizer. Create a concise but comprehensive summary of the following conversation that preserves all important context, decisions, and information. The summary will be used to maintain context in an ongoing conversation.',
+        },
+        {
+          role: 'user',
+          content: `Please summarize the following conversation:\n\n${messages.map(m => `${m.role}: ${m.content}`).join('\n\n')}`,
+        }
+      ];
+
+      const response = await this.getChatCompletion(summaryPrompt);
+      return response.response || 'Summary generation failed';
+    } catch (error) {
+      console.error('Error generating summary:', error);
+      return 'Unable to generate summary';
+    }
   }
 
   async getChatCompletion(

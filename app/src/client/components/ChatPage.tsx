@@ -16,7 +16,8 @@ function ChatPageContent() {
     loading, 
     getAIResponse, 
     loadConversation, 
-    currentConversationId
+    currentConversationId,
+    editMessage
   } = useChatContext();
   const [checking, setChecking] = useState(true);
   const [hasAccess, setHasAccess] = useState<boolean | null>(null);
@@ -153,7 +154,7 @@ function ChatPageContent() {
           </div>
         </div>
         <div className="flex-1 min-h-0">
-          <ChatContainer messages={messages} loading={loading} />
+          <ChatContainer messages={messages} loading={loading} onEditMessage={isAdmin ? undefined : editMessage} />
         </div>
         <div className="border-t bg-white">
           <MessageInput onSendMessage={handleSendMessage} loading={loading} />
@@ -165,7 +166,7 @@ function ChatPageContent() {
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 min-h-0">
-        <ChatContainer messages={messages} loading={loading} />
+        <ChatContainer messages={messages} loading={loading} onEditMessage={editMessage} />
       </div>
       <div className="border-t bg-white">
         <MessageInput onSendMessage={handleSendMessage} loading={loading} />

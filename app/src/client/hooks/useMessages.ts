@@ -51,22 +51,14 @@ export function useSendMessage() {
       console.log('Chat API result:', result)
       return { result, userMessage, originalConversationId: conversationId }
     },
-    onSuccess: ({ result, userMessage, originalConversationId }) => {
-      const { aiMessage, conversationId: resultConversationId, titleGenerated } = result
+    onSuccess: ({ result, originalConversationId }) => {
+      const { conversationId: resultConversationId, titleGenerated } = result
       const finalConversationId = resultConversationId || originalConversationId
 
       if (finalConversationId) {
-        const queryKey = queryKeys.message.list(finalConversationId)
-
-        // Update the messages cache
-        queryClient.setQueryData<ChatMessage[]>(queryKey, (old) => {
-          if (originalConversationId) {
-            // Existing conversation - add AI message (user message already added optimistically)
-            return old ? [...old, aiMessage] : [userMessage, aiMessage]
-          } else {
-            // New conversation - add both user and AI messages
-            return [userMessage, aiMessage]
-          }
+        // Invalidate messages to refetch from server with proper dbId
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.message.list(finalConversationId)
         })
       }
 

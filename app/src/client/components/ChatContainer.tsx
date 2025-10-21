@@ -7,6 +7,7 @@ import type { ChatMessage as ChatMessageType } from "../types/chat";
 interface ChatContainerProps {
   messages: ChatMessageType[];
   loading: boolean;
+  onEditMessage?: (messageId: number, newContent: string) => Promise<void>;
 }
 
 // Tailwind color to hex mapping for dynamic backgrounds
@@ -258,7 +259,7 @@ const tailwindColors: Record<string, string> = {
   'bg-black': '#000000',
 };
 
-export function ChatContainer({ messages, loading }: ChatContainerProps) {
+export function ChatContainer({ messages, loading, onEditMessage }: ChatContainerProps) {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Get background color from centralized hook (AI can change this via tool)
@@ -286,7 +287,7 @@ export function ChatContainer({ messages, loading }: ChatContainerProps) {
         </div>
       ) : (
         messages.map((message) => (
-          <ChatMessage key={message.id} message={message} />
+          <ChatMessage key={message.id} message={message} onEdit={onEditMessage} />
         ))
       )}
       {loading && <LoadingMessage />}

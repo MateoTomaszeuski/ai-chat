@@ -171,6 +171,55 @@ app.delete("/api/conversations/:id", requireAuth, async (req, res, next) => {
   }
 });
 
+// Edit a message
+app.put("/api/messages/:id", requireAuth, async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.email) {
+      return res.status(401).json({ error: 'User not authenticated or email not provided' });
+    }
+
+    // Check if user is admin - admins cannot edit messages (read-only access)
+    const isAdmin = await chatDBService.isUserAdmin(req.user.email);
+    if (isAdmin) {
+      return res.status(403).json({ error: 'Forbidden: Admins have read-only access and cannot edit messages' });
+    }
+
+    const messageId = parseInt(req.params.id);
+    if (isNaN(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID" });
+    }
+
+    const { new_content } = req.body;
+    if (!new_content || typeof new_content !== 'string' || new_content.trim().length === 0) {
+      return res.status(400).json({ error: "new_content is required and must be a non-empty string" });
+    }
+
+    const updatedMessage = await chatDBService.editMessage(messageId, new_content, req.user.email);
+    res.json(updatedMessage);
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Get edit history for a message
+app.get("/api/messages/:id/history", requireAuth, async (req, res, next) => {
+  try {
+    if (!req.user || !req.user.email) {
+      return res.status(401).json({ error: 'User not authenticated or email not provided' });
+    }
+
+    const messageId = parseInt(req.params.id);
+    if (isNaN(messageId)) {
+      return res.status(400).json({ error: "Invalid message ID" });
+    }
+
+    const editHistory = await chatDBService.getMessageEditHistory(messageId, req.user.email);
+    res.json(editHistory);
+  } catch (err) {
+    next(err);
+  }
+});
+
 app.post("/api/chat", requireAuth, async (req, res, next) => {
   try {
     if (!req.user || !req.user.email) {
@@ -225,9 +274,125 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
         await chatDBService.generateAndUpdateConversationTitle(conversation.id, lastUserMessage.content);
       }
     }
+
+    // Get messages for AI context (handles summarization automatically)
+    const contextMessages = await chatDBService.getMessagesForAIContext(conversation.id);
     
+    // Convert to AI format
+    const aiMessages = contextMessages.map(msg => ({
+      role: msg.message_type_id === 1 ? 'user' as const : 'assistant' as const,
+      content: msg.message_content,
+    }));
+
+    // Check if we need to create a summary
+    const tokenCount = aiService.countMessageTokens(aiMessages);
+    if (aiService.needsSummarization(tokenCount) && contextMessages.length > 0) {
+      console.log(`[SUMMARIZATION] Context has ${tokenCount} tokens, triggering summarization`);
+      
+      // Generate summary of all current context messages
+      const summary = await aiService.generateSummary(aiMessages);
+      
+      // Get the ID of the last message to be summarized
+      const lastMessageId = contextMessages[contextMessages.length - 1].id;
+      
+      // Save the summary to database
+      await chatDBService.saveConversationSummary(
+        conversation.id,
+        summary,
+        lastMessageId
+      );
+      
+      console.log(`[SUMMARIZATION] Summary created for conversation ${conversation.id}`);
+      
+      // After summarization, get fresh context (will only include new messages after summary)
+      const freshContextMessages = await chatDBService.getMessagesForAIContext(conversation.id);
+      const freshAiMessages = freshContextMessages.map(msg => ({
+        role: msg.message_type_id === 1 ? 'user' as const : 'assistant' as const,
+        content: msg.message_content,
+      }));
+      
+      // Prepend the summary as context
+      const messagesWithSummary = [
+        {
+          role: 'system' as const,
+          content: `Previous conversation summary: ${summary}`,
+        },
+        ...freshAiMessages
+      ];
+      
+      // Get AI response with summarized context
+      const result = await aiService.getChatCompletion(messagesWithSummary, tools);
+      
+      // Store the original tool calls to send to frontend
+      const executedToolCalls = result.toolCalls;
+      
+      // Handle tool calls if present
+      if (result.toolCalls && result.toolCalls.length > 0) {
+        const messagesWithToolCalls: Array<{
+          role: 'system' | 'user' | 'assistant' | 'tool';
+          content: string | null;
+          tool_calls?: Array<{
+            id: string;
+            type: 'function';
+            function: {
+              name: string;
+              arguments: string;
+            };
+          }>;
+          tool_call_id?: string;
+        }> = [
+          ...messagesWithSummary,
+          {
+            role: 'assistant' as const,
+            content: result.response || null,
+            tool_calls: result.toolCalls.map(tc => ({
+              id: tc.id,
+              type: 'function' as const,
+              function: {
+                name: tc.name,
+                arguments: JSON.stringify(tc.arguments),
+              },
+            })),
+          }
+        ];
+        
+        for (const toolCall of result.toolCalls) {
+          messagesWithToolCalls.push({
+            role: 'tool',
+            content: JSON.stringify({
+              success: true,
+              message: `Successfully executed ${toolCall.name}`,
+            }),
+            tool_call_id: toolCall.id,
+          });
+        }
+        
+        const finalResult = await aiService.getChatCompletion(messagesWithToolCalls, tools);
+        result.response = finalResult.response;
+        result.error = finalResult.error;
+      }
+      
+      // Save AI response to database if successful
+      if (result.response && !result.error) {
+        await chatDBService.saveMessage(
+          conversation.id,
+          2, // MESSAGE_TYPES.AI_RESPONSE
+          result.response
+        );
+      }
+      
+      return res.json({
+        response: result.response,
+        error: result.error,
+        toolCalls: executedToolCalls,
+        conversationId: conversation.id,
+        titleGenerated
+      });
+    }
+    
+    // No summarization needed - proceed normally
     // Get AI response - with tool execution loop
-    const result = await aiService.getChatCompletion(messages, tools);
+    const result = await aiService.getChatCompletion(aiMessages, tools);
     
     // Store the original tool calls to send to frontend
     const executedToolCalls = result.toolCalls;
@@ -247,7 +412,7 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
           };
         }>;
         tool_call_id?: string;
-      }> = messages.map(msg => ({
+      }> = aiMessages.map(msg => ({
         role: msg.role,
         content: msg.content,
       }));

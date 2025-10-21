@@ -38,5 +38,27 @@ CREATE TABLE IF NOT EXISTS messages (
   conversation_id INT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
   message_type_id INT NOT NULL REFERENCES message_types(id),
   message_content TEXT NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Message edits table (tracks all versions of edited messages)
+CREATE TABLE IF NOT EXISTS message_edits (
+  id SERIAL PRIMARY KEY,
+  message_id INT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  previous_content TEXT NOT NULL,
+  edited_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Conversation summaries table (stores summaries for context management)
+CREATE TABLE IF NOT EXISTS conversation_summaries (
+  id SERIAL PRIMARY KEY,
+  conversation_id INT NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  summary_content TEXT NOT NULL,
+  messages_summarized_up_to_id INT NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_messages_conversation_active ON messages(conversation_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_message_edits_message_id ON message_edits(message_id);
+CREATE INDEX IF NOT EXISTS idx_conversation_summaries_conversation_id ON conversation_summaries(conversation_id);

@@ -112,6 +112,7 @@ interface DbMessage {
   message_content: string;
   message_type_id: number;
   created_at: string;
+  is_edited?: boolean;
 }
 
 // Message API functions
@@ -127,6 +128,8 @@ export const messageApi = {
       content: msg.message_content,
       sender: msg.message_type_id === 1 ? 'user' as const : 'ai' as const,
       timestamp: new Date(msg.created_at),
+      dbId: msg.id,
+      isEdited: msg.is_edited || false,
     }));
   },
 };

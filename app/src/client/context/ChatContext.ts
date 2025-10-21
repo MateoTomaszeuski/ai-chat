@@ -23,6 +23,9 @@ export interface ChatContextType {
   loadConversations: () => Promise<void>;
   deleteConversation: (conversationId: number) => Promise<void>;
   
+  // Message management
+  editMessage: (messageId: number, newContent: string) => Promise<void>;
+  
   // Utility functions
   clearMessages: () => void;
 }

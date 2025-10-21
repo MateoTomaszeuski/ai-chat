@@ -45,10 +45,49 @@ export const MessageRowSchema = z.object({
   conversation_id: z.number().int().positive(),
   message_type_id: z.number().int(),
   message_content: z.string(),
+  is_active: z.boolean().default(true),
   created_at: z.coerce.string(),
 });
 
 export type Message = z.infer<typeof MessageRowSchema>;
+
+// Message edit schemas
+export const CreateMessageEditSchema = z.object({
+  message_id: z.number().int().positive(),
+  previous_content: z.string(),
+});
+
+export const MessageEditRowSchema = z.object({
+  id: z.number().int().positive(),
+  message_id: z.number().int().positive(),
+  previous_content: z.string(),
+  edited_at: z.coerce.string(),
+});
+
+export type MessageEdit = z.infer<typeof MessageEditRowSchema>;
+
+// Edit message request
+export const EditMessageSchema = z.object({
+  message_id: z.number().int().positive(),
+  new_content: z.string().min(1, "message content required"),
+});
+
+// Conversation summary schemas
+export const CreateConversationSummarySchema = z.object({
+  conversation_id: z.number().int().positive(),
+  summary_content: z.string().min(1, "summary content required"),
+  messages_summarized_up_to_id: z.number().int().positive(),
+});
+
+export const ConversationSummaryRowSchema = z.object({
+  id: z.number().int().positive(),
+  conversation_id: z.number().int().positive(),
+  summary_content: z.string(),
+  messages_summarized_up_to_id: z.number().int().positive(),
+  created_at: z.coerce.string(),
+});
+
+export type ConversationSummary = z.infer<typeof ConversationSummaryRowSchema>;
 
 // Message type constants
 export const MESSAGE_TYPES = {

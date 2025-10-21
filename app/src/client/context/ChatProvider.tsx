@@ -157,6 +157,26 @@ export function ChatProvider({ children }: ChatProviderProps) {
     await conversationsQuery.refetch();
   };
 
+  const editMessage = async (messageId: number, newContent: string) => {
+    if (!currentConversationId) {
+      throw new Error("No conversation selected");
+    }
+
+    try {
+      const { chatService } = await import("../services/chatService");
+      const success = await chatService.editMessage(messageId, newContent);
+      
+      if (success) {
+        await conversationMessagesQuery.refetch();
+      } else {
+        throw new Error("Failed to edit message");
+      }
+    } catch (error) {
+      console.error("Error editing message:", error);
+      throw error;
+    }
+  };
+
   const contextValue: ChatContextType = {
     messages,
     conversations,
@@ -169,6 +189,7 @@ export function ChatProvider({ children }: ChatProviderProps) {
     createNewConversation,
     loadConversations,
     deleteConversation,
+    editMessage,
     clearMessages,
   };
 
