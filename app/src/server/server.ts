@@ -247,7 +247,10 @@ app.post("/api/chat", requireAuth, async (req, res, next) => {
           };
         }>;
         tool_call_id?: string;
-      }> = [...messages];
+      }> = messages.map(msg => ({
+        role: msg.role,
+        content: msg.content,
+      }));
       
       // Add assistant message with tool calls
       messagesWithToolCalls.push({
