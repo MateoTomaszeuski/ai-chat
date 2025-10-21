@@ -1,6 +1,6 @@
-import { db } from "../server";
-import { CreateMessageSchema, CreateUserSchema, type Conversation, type Message, type User } from "../../lib/chatModels";
-import { AIService } from "./aiService";
+import { db } from "../server.js";
+import { CreateMessageSchema, CreateUserSchema, type Conversation, type Message, type User } from "../../lib/chatModels.js";
+import { AIService } from "./aiService.js";
 
 export class ChatDBService {
   private aiService: AIService;

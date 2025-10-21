@@ -3,10 +3,10 @@ import express from "express";
 import cors from "cors";
 import pgPromise from "pg-promise";
 import { readFile } from "node:fs/promises";
-import { AIService, ChatRequest } from "./services/aiService";
-import { chatDBService } from "./services/chatDBService";
-import { authService, requireAuth } from "./middleware/auth";
-import { getAuthConfig } from "./config/auth";
+import { AIService, ChatRequest } from "./services/aiService.js";
+import { chatDBService } from "./services/chatDBService.js";
+import { authService, requireAuth } from "./middleware/auth.js";
+import { getAuthConfig } from "./config/auth.js";
 
 const pgp = pgPromise({});
 const connectionString = process.env.DATABASE_URL;
