@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS messages (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Add is_active column if it doesn't exist (for existing databases)
+DO $$ 
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns 
+                 WHERE table_name = 'messages' AND column_name = 'is_active') THEN
+    ALTER TABLE messages ADD COLUMN is_active BOOLEAN NOT NULL DEFAULT true;
+  END IF;
+END $$;
+
 -- Message edits table (tracks all versions of edited messages)
 CREATE TABLE IF NOT EXISTS message_edits (
   id SERIAL PRIMARY KEY,
