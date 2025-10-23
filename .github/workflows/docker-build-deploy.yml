@@ -1,4 +1,4 @@
-name: Build and Deploy Docker Images
+name: Build and Deploy Docker Images & Apply Kubernetes Changes
 
 on:
   push:
@@ -44,3 +44,19 @@ jobs:
       - name: Push backend image to DockerHub
         if: github.event_name != 'pull_request'
         run: docker push ${{ secrets.DOCKER_USERNAME }}/aichat-backend:${{ github.run_number }}
+
+      - name: Set up kube config
+        run: export KUBECONFIG=$HOME/.kube/config
+        
+      - name: Check Nodes
+        run: kubectl get nodes
+
+      - name: Apply Kubernetes Changes
+        run: |
+          export BUILD_NUMBER=${{ github.run_number }}
+          export NAMESPACE=mateo-aichat
+          
+          for FILE in "kube"/*
+          do
+              cat $FILE | envsubst | kubectl apply -f -
+          done
