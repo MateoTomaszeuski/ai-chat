@@ -27,6 +27,8 @@ jobs:
           docker buildx \
           build --platform linux/amd64 \
           -f ./Dockerfile.client \
+          --build-arg VITE_OIDC_AUTHORITY=https://auth-dev.snowse.io/realms/DevRealm \
+          --build-arg VITE_OIDC_CLIENT_ID=mateo-chat \
           -t ${{ secrets.DOCKER_USERNAME }}/aichat-frontend:${{ github.run_number }} \
           .
 
