@@ -3,12 +3,10 @@ kind: Ingress
 metadata:
   name: mateo-ai-frontend-ingress
   namespace: $NAMESPACE
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
-  - host: aichat.yourdomain.com
+  - host: mateo-ai-chat.duckdns.org
     http:
       paths:
       - path: /
