@@ -1,0 +1,68 @@
+services:
+  swag:
+    image: lscr.io/linuxserver/swag:latest
+    container_name: swag
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=America/Denver
+      - URL=mateo-ai-chat.duckdns.org
+      - VALIDATION=dns
+      - SUBDOMAINS=wildcard 
+      - DNSPLUGIN=duckdns
+      - dns_duckdns_token=ed68963f-3014-479d-aba7-6484727b28e8
+    volumes:
+      - ./swag-config:/config
+      - ./swag-default.conf:/config/nginx/site-confs/default.conf
+    ports:
+      - 443:443
+      - 80:80
+    restart: unless-stopped
+
+  web:
+    image: node:20-alpine
+    ports:
+      - "5173:5173"
+    environment:
+      - NODE_ENV=development
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    command: >-
+      sh -c "npm install -g pnpm && pnpm i && pnpm run dev"
+    depends_on:
+      - api
+
+  api:
+    image: node:20-alpine
+    ports:
+      - "4000:4000"
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - /app/node_modules
+    environment:
+      PORT: "4000"
+      DATABASE_URL: postgres://appuser:apppassword@db:5432/appdb
+    command: >-
+      sh -c "npm install -g pnpm && pnpm i && pnpm run dev:server"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=appuser
+      - POSTGRES_PASSWORD=apppassword
+      - POSTGRES_DB=appdb
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+# psql -U appuser appdb
+
+volumes:
+  pg_data:

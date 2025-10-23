@@ -5,6 +5,10 @@ metadata:
   namespace: $NAMESPACE
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.mateo-ai-chat.duckdns.org
+    secretName: mateo-ai-tls-secret
   rules:
   - host: api.mateo-ai-chat.duckdns.org
     http:
