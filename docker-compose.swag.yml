@@ -10,7 +10,7 @@ services:
       - TZ=America/Denver
       - URL=mateo-ai-chat.duckdns.org
       - VALIDATION=dns
-      - SUBDOMAINS=wildcard 
+      - ONLY_SUBDOMAINS=false
       - DNSPLUGIN=duckdns
       - dns_duckdns_token=ed68963f-3014-479d-aba7-6484727b28e8
     volumes:
