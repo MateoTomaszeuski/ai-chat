@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mateo-ai-frontend
+  namespace: $NAMESPACE
+  labels:
+    app: aichat-frontend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aichat-frontend
+  template:
+    metadata:
+      labels:
+        app: aichat-frontend
+    spec:
+      containers:
+      - name: mateo-ai-frontend
+        image: mateotomaszeuski/aichat-frontend:$BUILD_NUMBER
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "50m"
+          limits:
+            memory: "128Mi"
+            cpu: "100m"

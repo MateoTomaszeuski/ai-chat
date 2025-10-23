@@ -1,0 +1,31 @@
+name: Deploy to Kubernetes
+
+on:
+  workflow_run:
+    workflows: ["Build and Deploy Docker Images"]
+    types:
+      - completed
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    
+    steps:
+    - uses: actions/checkout@v4 # git clone
+    
+    - name: Set up kube config
+      run: export KUBECONFIG=$HOME/.kube/config
+      
+    - name: Check Nodes
+      run: kubectl get nodes
+
+    - name: Apply Kubernetes Changes
+      run: |
+        export BUILD_NUMBER=${{ github.run_number }}
+        export NAMESPACE=mateo-aichat
+        
+        for FILE in "kube"/*
+        do
+            cat $FILE | envsubst | kubectl apply -f -
+        done
