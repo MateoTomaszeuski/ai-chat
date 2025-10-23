@@ -5,6 +5,8 @@ services:
       - "5173:5173"
     environment:
       - NODE_ENV=development
+    env_file:
+      - ./app/.env
     working_dir: /app
     volumes:
       - ./app:/app
@@ -22,6 +24,8 @@ services:
     volumes:
       - ./app:/app
       - /app/node_modules
+    env_file:
+      - ./app/.env
     environment:
       PORT: "4000"
       DATABASE_URL: postgres://appuser:apppassword@db:5432/appdb

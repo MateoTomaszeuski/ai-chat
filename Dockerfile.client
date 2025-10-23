@@ -13,9 +13,15 @@ COPY app/src/client ./src/client
 COPY app/src/vite-env.d.ts ./src/
 
 ARG VITE_OIDC_AUTHORITY=https://auth-dev.snowse.io/realms/DevRealm
-ARG VITE_OIDC_CLIENT_ID=aichat
+ARG VITE_OIDC_CLIENT_ID=mateo-chat
+ARG VITE_REDIRECT_URI=https://mateo-ai-chat.duckdns.org/callback
+ARG VITE_POST_LOGOUT_REDIRECT_URI=https://mateo-ai-chat.duckdns.org/
+ARG VITE_SILENT_REDIRECT_URI=https://mateo-ai-chat.duckdns.org/silent-refresh
 ENV VITE_OIDC_AUTHORITY=$VITE_OIDC_AUTHORITY
 ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
+ENV VITE_REDIRECT_URI=$VITE_REDIRECT_URI
+ENV VITE_POST_LOGOUT_REDIRECT_URI=$VITE_POST_LOGOUT_REDIRECT_URI
+ENV VITE_SILENT_REDIRECT_URI=$VITE_SILENT_REDIRECT_URI
 
 RUN pnpm run build
 

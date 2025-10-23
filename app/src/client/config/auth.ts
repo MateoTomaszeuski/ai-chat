@@ -9,9 +9,9 @@ export const oidcConfig: UserManagerSettings = {
   client_id: import.meta.env.VITE_OIDC_CLIENT_ID || 'your-client-id',
   
   // Redirect URIs - these need to match what's configured in your OIDC provider
-  redirect_uri: `${window.location.origin}/callback`,
-  post_logout_redirect_uri: `${window.location.origin}/`,
-  silent_redirect_uri: `${window.location.origin}/silent-refresh`,
+  redirect_uri: import.meta.env.VITE_REDIRECT_URI || `${window.location.origin}/callback`,
+  post_logout_redirect_uri: import.meta.env.VITE_POST_LOGOUT_REDIRECT_URI || `${window.location.origin}/`,
+  silent_redirect_uri: import.meta.env.VITE_SILENT_REDIRECT_URI || `${window.location.origin}/silent-refresh`,
   
   // Response type for Authorization Code flow with PKCE
   response_type: 'code',
