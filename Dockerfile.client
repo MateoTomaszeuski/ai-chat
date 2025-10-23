@@ -12,6 +12,11 @@ COPY app/tsconfig.json app/vite.config.ts app/index.html ./
 COPY app/src/client ./src/client
 COPY app/src/vite-env.d.ts ./src/
 
+ARG VITE_OIDC_AUTHORITY=https://auth-dev.snowse.io/realms/DevRealm
+ARG VITE_OIDC_CLIENT_ID=aichat
+ENV VITE_OIDC_AUTHORITY=$VITE_OIDC_AUTHORITY
+ENV VITE_OIDC_CLIENT_ID=$VITE_OIDC_CLIENT_ID
+
 RUN pnpm run build
 
 FROM nginx:alpine
